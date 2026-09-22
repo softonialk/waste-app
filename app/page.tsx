@@ -71,15 +71,18 @@ export default function Home() {
       </header>
 
       <section className="hero section" id="home">
-        <Image className="hero-cover-image" src="/waste-forest-hero.jpeg" alt="" fill priority sizes="100vw" aria-hidden="true" />
-        <Image className="hero-contained-image" src="/waste-forest-hero.jpeg" alt="Recyclable waste transforming into a thriving green forest" fill priority sizes="(max-width: 980px) 100vw, 62vw" />
-        <div className="hero-cover-overlay"></div>
         <div className="hero-copy">
           <p className="badge"><span>♻</span> Smart Waste Management for a Cleaner Sri Lanka</p>
           <h1>Turn Your Waste Into a <em>Better Tomorrow.</em></h1>
           <p className="hero-text">Sort your waste, schedule collections, earn rewards, and help build cleaner communities — all from one simple platform.</p>
           <div className="hero-actions"><a className="button" href="#collection-points">Start Recycling <span>→</span></a><a className="button button-ghost" href="#how">Explore How It Works</a></div>
           <div className="hero-stats"><div><strong>10K+</strong><span>Households</span></div><div><strong>25K+</strong><span>Items Recycled</span></div><div><strong>50+</strong><span>Collection Points</span></div></div>
+        </div>
+        <div className="hero-visual hero-map-visual" aria-label="EcoLoop collection network across Sri Lanka">
+          <div className="hero-map-glow"></div>
+          <Image className="hero-map-image" src="/sri-lanka-eco-map.png" alt="Green three-dimensional map of Sri Lanka with EcoLoop collection points" width={1024} height={1536} priority />
+          <div className="hero-map-chip chip-network"><span>●</span><div><b>50+ active points</b><small>Islandwide network</small></div></div>
+          <div className="hero-map-chip chip-impact"><span>♻</span><div><b>12,540 kg</b><small>Waste recycled</small></div></div>
         </div>
       </section>
 
