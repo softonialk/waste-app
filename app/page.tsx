@@ -78,19 +78,11 @@ export default function Home() {
           <div className="hero-actions"><a className="button" href="#collection-points">Start Recycling <span>→</span></a><a className="button button-ghost" href="#how">Explore How It Works</a></div>
           <div className="hero-stats"><div><strong>10K+</strong><span>Households</span></div><div><strong>25K+</strong><span>Items Recycled</span></div><div><strong>50+</strong><span>Collection Points</span></div></div>
         </div>
-        <div className="hero-visual" aria-label="EcoLoop mobile application preview">
-          <div className="orbit-label plastic"><i>♻</i><span>Plastic</span></div><div className="orbit-label paper"><i>▦</i><span>Paper</span></div><div className="orbit-label metal"><i>◉</i><span>Metal</span></div><div className="orbit-label glass"><i>◇</i><span>Glass</span></div>
-          <div className="phone-shadow"></div>
-          <div className="phone">
-            <div className="phone-top"><span>9:41</span><span>● ◔ ▰</span></div>
-            <div className="phone-head"><div><small>Good morning,</small><strong>Nethmi 👋</strong></div><button>◉</button></div>
-            <div className="points-card"><span>ECO POINTS</span><strong>2,480</strong><small>↗ +120 this week</small><div className="leaf-mark">❧</div></div>
-            <div className="phone-section-title"><strong>Upcoming collection</strong><span>View all</span></div>
-            <div className="collection-card"><div className="calendar"><b>24</b><span>SEP</span></div><div><strong>Recyclables</strong><small>Tomorrow · 8–10 AM</small></div><span className="status">Confirmed</span></div>
-            <div className="progress-card"><div><strong>September goal</strong><span>72%</span></div><div className="progress-track"><i></i></div><small>18 kg of 25 kg recycled</small></div>
-            <button className="phone-cta">＋ Schedule a collection</button>
-          </div>
-          <div className="floating-reward"><span>✦</span><div><b>+120</b><small>Eco Points</small></div></div>
+        <div className="hero-visual hero-map-visual" aria-label="EcoLoop collection network across Sri Lanka">
+          <div className="hero-map-glow"></div>
+          <Image className="hero-map-image" src="/sri-lanka-eco-map.png" alt="Green three-dimensional map of Sri Lanka with EcoLoop collection points" width={1024} height={1536} priority />
+          <div className="hero-map-chip chip-network"><span>●</span><div><b>50+ active points</b><small>Islandwide network</small></div></div>
+          <div className="hero-map-chip chip-impact"><span>♻</span><div><b>12,540 kg</b><small>Waste recycled</small></div></div>
         </div>
       </section>
 
