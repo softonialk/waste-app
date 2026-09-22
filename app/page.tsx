@@ -71,7 +71,8 @@ export default function Home() {
       </header>
 
       <section className="hero section" id="home">
-        <Image className="hero-cover-image" src="/waste-forest-hero.jpeg" alt="Recyclable waste transforming into a thriving green forest" fill priority sizes="100vw" />
+        <Image className="hero-cover-image" src="/waste-forest-hero.jpeg" alt="" fill priority sizes="100vw" aria-hidden="true" />
+        <Image className="hero-contained-image" src="/waste-forest-hero.jpeg" alt="Recyclable waste transforming into a thriving green forest" fill priority sizes="(max-width: 980px) 100vw, 62vw" />
         <div className="hero-cover-overlay"></div>
         <div className="hero-copy">
           <p className="badge"><span>♻</span> Smart Waste Management for a Cleaner Sri Lanka</p>
