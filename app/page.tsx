@@ -1,101 +1,131 @@
 "use client";
 
+import Image from "next/image";
 import { FormEvent, useEffect, useState } from "react";
 
-const wasteTypes = [
-  { id: "recyclable", icon: "♻", label: "Recyclables", hint: "Plastic, paper & cans" },
-  { id: "organic", icon: "◒", label: "Organic", hint: "Food & garden waste" },
-  { id: "mixed", icon: "▧", label: "Mixed waste", hint: "Everyday household waste" },
+const steps = [
+  { n: "01", icon: "⌘", title: "Sort", text: "Separate recyclable waste according to its category." },
+  { n: "02", icon: "◷", title: "Schedule", text: "Choose a convenient collection date and location." },
+  { n: "03", icon: "▣", title: "Collect", text: "Hand it to a verified collector or collection point." },
+  { n: "04", icon: "✦", title: "Earn", text: "Receive Eco Points and unlock useful rewards." },
+];
+
+const categories = [
+  { icon: "♻", title: "Plastic", items: "Bottles · Containers · Packaging", color: "mint" },
+  { icon: "▦", title: "Paper & Cardboard", items: "Newspapers · Boxes · Office paper", color: "sand" },
+  { icon: "◉", title: "Metal", items: "Cans · Aluminium · Metal containers", color: "blue" },
+  { icon: "◇", title: "Glass", items: "Glass bottles · Jars · Containers", color: "aqua" },
+  { icon: "❧", title: "Organic", items: "Food · Garden · Biodegradable waste", color: "lime" },
+  { icon: "⚡", title: "E-Waste", items: "Batteries · Phones · Small electronics", color: "coral" },
 ];
 
 export default function Home() {
-  const [service, setService] = useState<"scheduled" | "urgent">("scheduled");
-  const [waste, setWaste] = useState("recyclable");
-  const [bags, setBags] = useState(2);
-  const [submitted, setSubmitted] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [location, setLocation] = useState("");
+  const [filters, setFilters] = useState(["Plastic", "Paper"]);
+  const [searched, setSearched] = useState(false);
 
   useEffect(() => {
-    type PickupInput = { service: "scheduled" | "urgent"; waste: string; bags: number };
     type ToolContext = { registerTool: (tool: object, options?: { signal?: AbortSignal }) => void | Promise<void> };
     const context = (document as Document & { modelContext?: ToolContext }).modelContext;
     if (!context?.registerTool) return;
     const lifecycle = new AbortController();
-    const register = context.registerTool({
-      name: "create_waste_pickup",
-      title: "Book a waste pickup",
-      description: "Choose a scheduled or urgent pickup and submit it in the visible Aiwa booking form.",
-      inputSchema: {
-        type: "object",
-        properties: {
-          service: { type: "string", enum: ["scheduled", "urgent"] },
-          waste: { type: "string", enum: ["recyclable", "organic", "mixed"] },
-          bags: { type: "integer", minimum: 1, maximum: 10 },
-        },
-        required: ["service", "waste", "bags"],
-        additionalProperties: false,
-      },
-      annotations: { readOnlyHint: false, untrustedContentHint: false },
+    const registration = context.registerTool({
+      name: "find_collection_points",
+      title: "Find collection points",
+      description: "Search EcoLoop collection points by a Sri Lankan location and accepted waste categories.",
+      inputSchema: { type: "object", properties: { location: { type: "string" }, categories: { type: "array", items: { type: "string", enum: ["Plastic", "Paper", "Glass", "Metal"] } } }, required: ["location", "categories"], additionalProperties: false },
+      annotations: { readOnlyHint: true, untrustedContentHint: false },
       execute(input: unknown) {
-        const value = input as PickupInput;
-        if (!["scheduled", "urgent"].includes(value?.service) || !wasteTypes.some((type) => type.id === value?.waste) || !Number.isInteger(value?.bags) || value.bags < 1 || value.bags > 10) {
-          throw new Error("Invalid pickup details.");
-        }
-        setService(value.service);
-        setWaste(value.waste);
-        setBags(value.bags);
-        setSubmitted(true);
-        return { status: "requested", service: value.service, waste: value.waste, bags: value.bags };
+        const value = input as { location?: string; categories?: string[] };
+        if (!value.location?.trim() || !Array.isArray(value.categories)) throw new Error("Enter a location and category list.");
+        setLocation(value.location);
+        setFilters(value.categories);
+        setSearched(true);
+        document.querySelector("#collection-points")?.scrollIntoView({ behavior: "smooth" });
+        return { name: "Eco Collection Point", distance: "2.4 km", open: true, accepts: value.categories };
       },
     }, { signal: lifecycle.signal });
-    void Promise.resolve(register).catch(() => undefined);
+    void Promise.resolve(registration).catch(() => undefined);
     return () => lifecycle.abort();
   }, []);
 
-  function submitRequest(event: FormEvent) {
+  function toggleFilter(filter: string) {
+    setFilters((current) => current.includes(filter) ? current.filter((item) => item !== filter) : [...current, filter]);
+  }
+
+  function submitSearch(event: FormEvent) {
     event.preventDefault();
-    setSubmitted(true);
+    setSearched(true);
   }
 
   return (
-    <main className="site-shell">
-      <header className="topbar">
-        <a className="brand" href="#" aria-label="Aiwa home"><span className="brand-mark">A</span><span>Aiwa</span></a>
-        <nav className="main-nav" aria-label="Main navigation"><a className="active" href="#pickup">Book a pickup</a><a href="#activity">My activity</a><a href="#rewards">Rewards</a></nav>
-        <div className="user-actions"><div className="coin-pill"><span>●</span> 1,240 <small>coins</small></div><button className="avatar" aria-label="Open profile">SN</button></div>
+    <main>
+      <header className="navbar">
+        <a className="logo" href="#home"><span className="logo-mark">↻</span><span><b>EcoLoop</b><small>Smart Waste Management</small></span></a>
+        <button className="menu-button" aria-label="Toggle menu" onClick={() => setMenuOpen(!menuOpen)}>☰</button>
+        <nav className={menuOpen ? "nav-links open" : "nav-links"}>
+          <a href="#home">Home</a><a href="#how">How It Works</a><a href="#categories">Waste Categories</a><a href="#rewards">Rewards</a><a href="#impact">Impact</a>
+        </nav>
+        <div className="nav-actions"><button className="text-button">Log in</button><a className="button button-small" href="#collection-points">Get Started <span>↗</span></a></div>
       </header>
 
-      <section className="workspace" id="pickup">
-        <div className="intro-row">
-          <div><p className="eyebrow">GOOD MORNING, SANDUNI</p><h1>Let&apos;s clear the clutter.</h1><p>Book a verified collector now, or add your home to tomorrow&apos;s free route.</p></div>
-          <div className="impact-card" aria-label="Environmental impact"><div className="impact-icon">↗</div><div><strong>18.4 kg</strong><span>diverted from landfill</span></div><div className="mini-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+      <section className="hero section" id="home">
+        <div className="hero-copy">
+          <p className="badge"><span>♻</span> Smart Waste Management for a Cleaner Sri Lanka</p>
+          <h1>Turn Your Waste Into a <em>Better Tomorrow.</em></h1>
+          <p className="hero-text">Sort your waste, schedule collections, earn rewards, and help build cleaner communities — all from one simple platform.</p>
+          <div className="hero-actions"><a className="button" href="#collection-points">Start Recycling <span>→</span></a><a className="button button-ghost" href="#how">Explore How It Works</a></div>
+          <div className="hero-stats"><div><strong>10K+</strong><span>Households</span></div><div><strong>25K+</strong><span>Items Recycled</span></div><div><strong>50+</strong><span>Collection Points</span></div></div>
         </div>
-
-        <div className="dashboard-grid">
-          <form className="booking-card" onSubmit={submitRequest}>
-            <div className="card-heading"><div><span className="step-number">01</span><h2>Choose your pickup</h2></div><span className="live"><i></i> 7 collectors nearby</span></div>
-            <div className="service-tabs" role="radiogroup" aria-label="Pickup speed">
-              <button type="button" className={service === "scheduled" ? "selected" : ""} onClick={() => setService("scheduled")} aria-pressed={service === "scheduled"}><span className="tab-icon">◷</span><span><strong>Schedule free</strong><small>Tomorrow · 8 AM–12 PM</small></span><b>FREE</b></button>
-              <button type="button" className={service === "urgent" ? "selected" : ""} onClick={() => setService("urgent")} aria-pressed={service === "urgent"}><span className="tab-icon">ϟ</span><span><strong>Pickup now</strong><small>A collector in 30–45 min</small></span><b>Rs. 390</b></button>
-            </div>
-            <div className="section-label"><span className="step-number">02</span><h2>What are we collecting?</h2></div>
-            <div className="waste-grid">
-              {wasteTypes.map((type) => <button key={type.id} type="button" className={waste === type.id ? "waste-option selected" : "waste-option"} onClick={() => setWaste(type.id)} aria-pressed={waste === type.id}><span>{type.icon}</span><strong>{type.label}</strong><small>{type.hint}</small></button>)}
-            </div>
-            <div className="booking-details">
-              <label><span>Pickup address</span><div className="input-wrap"><i>⌖</i><input aria-label="Pickup address" defaultValue="24, Temple Road, Nugegoda" /></div></label>
-              <label><span>Number of bags</span><div className="bag-counter"><button type="button" onClick={() => setBags(Math.max(1, bags - 1))} aria-label="Remove a bag">−</button><strong>{bags}</strong><button type="button" onClick={() => setBags(Math.min(10, bags + 1))} aria-label="Add a bag">+</button></div></label>
-            </div>
-            {submitted ? <div className="success-message" role="status"><span>✓</span><div><strong>Pickup requested!</strong><small>We&apos;ll notify you when a collector accepts.</small></div><button type="button" onClick={() => setSubmitted(false)}>Done</button></div> : <button className="primary-button" type="submit">{service === "scheduled" ? "Schedule free pickup" : "Find a collector now"}<span>→</span></button>}
-            <p className="fine-print">No cash needed. Earn 20 coins when recyclable waste is verified.</p>
-          </form>
-
-          <aside className="side-column">
-            <div className="map-card"><div className="map-top"><span><i></i> LIVE NEAR YOU</span><button aria-label="Centre map">⌖</button></div><div className="map-canvas" aria-label="Map showing nearby collectors"><div className="road road-one"></div><div className="road road-two"></div><div className="road road-three"></div><span className="place p1">NUGEGODA</span><span className="place p2">PAGODA</span><span className="place p3">MIRIHANA</span><span className="collector c1">♻</span><span className="collector c2">♻</span><span className="collector c3">♻</span><span className="home-pin">⌂</span></div><div className="collector-card"><div className="collector-avatar">RK<span></span></div><div><strong>Ruwan K.</strong><span>★ 4.9 · 312 pickups</span></div><div className="eta"><strong>8 min</strong><span>away</span></div></div></div>
-            <div className="route-card"><div className="route-date"><strong>24</strong><span>SEP</span></div><div><span className="overline">YOUR NEXT FREE ROUTE</span><strong>Tomorrow morning</strong><small>3 neighbours have already joined</small></div><div className="neighbour-dots"><i>AM</i><i>RK</i><i>+1</i></div></div>
-          </aside>
+        <div className="hero-visual" aria-label="EcoLoop mobile application preview">
+          <div className="orbit-label plastic"><i>♻</i><span>Plastic</span></div><div className="orbit-label paper"><i>▦</i><span>Paper</span></div><div className="orbit-label metal"><i>◉</i><span>Metal</span></div><div className="orbit-label glass"><i>◇</i><span>Glass</span></div>
+          <div className="phone-shadow"></div>
+          <div className="phone">
+            <div className="phone-top"><span>9:41</span><span>● ◔ ▰</span></div>
+            <div className="phone-head"><div><small>Good morning,</small><strong>Nethmi 👋</strong></div><button>◉</button></div>
+            <div className="points-card"><span>ECO POINTS</span><strong>2,480</strong><small>↗ +120 this week</small><div className="leaf-mark">❧</div></div>
+            <div className="phone-section-title"><strong>Upcoming collection</strong><span>View all</span></div>
+            <div className="collection-card"><div className="calendar"><b>24</b><span>SEP</span></div><div><strong>Recyclables</strong><small>Tomorrow · 8–10 AM</small></div><span className="status">Confirmed</span></div>
+            <div className="progress-card"><div><strong>September goal</strong><span>72%</span></div><div className="progress-track"><i></i></div><small>18 kg of 25 kg recycled</small></div>
+            <button className="phone-cta">＋ Schedule a collection</button>
+          </div>
+          <div className="floating-reward"><span>✦</span><div><b>+120</b><small>Eco Points</small></div></div>
         </div>
       </section>
-      <footer><span>© 2026 Aiwa</span><p>Cleaner streets, one pickup at a time.</p><div><a href="#">Help</a><a href="#">Safety</a><a href="#">සිංහල</a></div></footer>
+
+      <section className="trust-strip"><span>BUILT FOR CLEANER COMMUNITIES ACROSS SRI LANKA</span><div><b>⌂</b> Households</div><div><b>♻</b> Collectors</div><div><b>◎</b> Recycling Centers</div><div><b>◉</b> Local Communities</div></section>
+
+      <section className="section centered" id="how">
+        <p className="kicker">HOW IT WORKS</p><h2>Waste Management <em>Made Simple.</em></h2><p className="section-intro">From sorting your waste to earning rewards, everything happens in a few simple steps.</p>
+        <div className="steps-grid">{steps.map((step, index) => <article className="step-card" key={step.title}><span className="step-number">{step.n}</span><div className="step-icon">{step.icon}</div><h3>{step.title}</h3><p>{step.text}</p>{index < steps.length - 1 && <span className="step-arrow">→</span>}</article>)}</div>
+      </section>
+
+      <section className="category-section" id="categories"><div className="section">
+        <div className="section-heading-row"><div><p className="kicker">WASTE CATEGORIES</p><h2>Know Your <em>Waste.</em></h2></div><p>Not all waste belongs in the same bin. Learn how to identify and separate recyclable materials correctly.</p></div>
+        <div className="category-grid">{categories.map((category) => <article className={`category-card ${category.color}`} key={category.title}><span className="category-icon">{category.icon}</span><div><h3>{category.title}</h3><p>{category.items}</p></div><button aria-label={`Learn about ${category.title}`}>↗</button></article>)}</div>
+        <div className="tip-bar"><span>◎</span><div><b>Not sure where it belongs?</b><p>Our smart waste guide can help you identify the right category.</p></div><button>Try Waste Guide <span>→</span></button></div>
+      </div></section>
+
+      <section className="section rewards" id="rewards">
+        <div className="rewards-copy"><p className="kicker">ECO REWARDS</p><h2>Your Waste Has <em>Value.</em></h2><p>Recycle more, earn Eco Points, and turn responsible waste management into meaningful rewards.</p><div className="point-rules"><div><span>♻</span><p>Recycle plastic</p><b>+20</b></div><div><span>▦</span><p>Recycle cardboard</p><b>+15</b></div><div><span>◉</span><p>Recycle metal</p><b>+25</b></div><div><span>◇</span><p>Recycle glass</p><b>+20</b></div></div></div>
+        <div className="rewards-visual"><div className="eco-card"><span className="eco-leaf">❧</span><small>ECO POINTS</small><strong>2,480</strong><p>↗ +120 this week</p><button>View rewards <span>→</span></button><i className="ring-one"></i><i className="ring-two"></i></div><div className="reward-chips"><span>🎟️ Vouchers</span><span>🛍️ Partner offers</span><span>🌱 Eco products</span><span>🎁 Community rewards</span></div></div>
+      </section>
+
+      <section className="map-section" id="collection-points"><div className="section"><div className="map-title"><p className="kicker">COLLECTION NETWORK</p><h2>Find Your Nearest <em>Collection Point.</em></h2><p>Discover nearby recycling centers and drop-off points around your community.</p></div>
+        <div className="finder-layout"><div className="fake-map"><div className="map-road r1"></div><div className="map-road r2"></div><div className="map-road r3"></div><span className="map-label ml1">NUGEGODA</span><span className="map-label ml2">KOTTE</span><span className="map-label ml3">MAHARAGAMA</span><span className="map-pin mp1">♻</span><span className="map-pin mp2">♻</span><span className="map-pin mp3">♻</span><span className="you-pin">⌂</span><div className="map-key"><span><i className="green-dot"></i> Collection point</span><span><i className="dark-dot"></i> You are here</span></div></div>
+          <form className="finder-panel" onSubmit={submitSearch}><h3>Find a collection point</h3><label><span>YOUR LOCATION</span><div className="search-input"><i>⌖</i><input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Search suburb or city..." /></div></label><fieldset><legend>ACCEPTED WASTE</legend>{["Plastic","Paper","Glass","Metal"].map((filter) => <label className="check" key={filter}><input type="checkbox" checked={filters.includes(filter)} onChange={() => toggleFilter(filter)} /><span>{filter}</span></label>)}</fieldset><button className="button search-button" type="submit">Find Nearby <span>→</span></button>
+            <div className={searched ? "result-card revealed" : "result-card"}><div className="result-head"><span>♻</span><div><b>Eco Collection Point</b><small>2.4 km away</small></div><i>OPEN TODAY</i></div><p>Accepts: {filters.length ? filters.join(" · ") : "General recyclables"}</p><button type="button">View Details <span>↗</span></button></div>
+          </form></div>
+      </div></section>
+
+      <section className="section impact" id="impact"><div className="impact-copy"><p className="kicker">OUR COLLECTIVE IMPACT</p><h2>Every Small Action Creates an <em>Impact.</em></h2><p>When households, collectors and communities work together, everyday habits become measurable progress.</p><div className="impact-stats"><div><strong>12,540 <small>kg</small></strong><span>Waste recycled</span></div><div><strong>8,230</strong><span>Households participating</span></div><div><strong>4,850 <small>kg</small></strong><span>Plastic diverted</span></div><div><strong>1,240</strong><span>Collections completed</span></div></div></div><div className="impact-circle"><div className="outer-ring"><div><span>♻</span><strong>12,540</strong><small>KG RECYCLED<br/>THIS MONTH</small></div></div><span className="ring-note one">72% monthly goal</span><span className="ring-note two">↗ 18% vs last month</span></div></section>
+
+      <section className="community"><div className="section community-grid"><div><p className="kicker">MADE FOR SRI LANKA</p><h2>Cleaner Communities <em>Start With Us.</em> 🇱🇰</h2><p>Connect households, collectors, recycling centers and local communities through one smarter waste-management platform.</p><div className="province-list"><span><i></i>Western Province</span><span><i></i>Central Province</span><span><i></i>Southern Province</span><span><i></i>North Western Province</span></div><a className="button button-light" href="#collection-points">Join Your Community <span>→</span></a></div><div className="island-visual"><Image src="/sri-lanka-eco-map.png" alt="EcoLoop collection network across Sri Lanka" width={1024} height={1536} priority={false}/></div></div></section>
+
+      <section className="section final-cta"><div><span className="cta-icon">↻</span><h2>Ready to Make Your <em>Waste Count?</em></h2><p>Start recycling smarter today and become part of a cleaner, more responsible community.</p><div><a className="button button-light" href="#collection-points">Get Started <span>→</span></a><a className="button button-outline-light" href="#collection-points">Explore Collection Points</a></div><small>♻ Sort better. Recycle smarter. Live cleaner.</small></div></section>
+
+      <footer className="footer"><div className="footer-grid"><div className="footer-brand"><a className="logo" href="#home"><span className="logo-mark">↻</span><span><b>EcoLoop</b><small>Smart Waste Management</small></span></a><p>Smart waste management for a cleaner tomorrow.</p><div className="socials"><button>f</button><button>◎</button><button>in</button></div></div><div><h4>Platform</h4><a href="#home">Home</a><a href="#how">How It Works</a><a href="#categories">Waste Categories</a><a href="#rewards">Rewards</a><a href="#collection-points">Collection Points</a></div><div><h4>Resources</h4><a href="#categories">Recycling Guide</a><a href="#">FAQ</a><a href="#">Community</a><a href="#">Help Center</a></div><div><h4>Company</h4><a href="#">About Us</a><a href="#">Contact</a><a href="#">Privacy Policy</a><a href="#">Terms</a></div><div><h4>Contact</h4><span>✉ hello@ecoloop.lk</span><span>⌖ Sri Lanka</span></div></div><div className="footer-bottom"><span>© 2026 EcoLoop. All rights reserved.</span><span>Built for a cleaner Sri Lanka 🇱🇰</span></div></footer>
     </main>
   );
 }

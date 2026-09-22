@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Aiwa — Waste pickup, when you need it",
-  description: "Schedule a free community waste pickup or find a verified collector nearby.",
+  title: "EcoLoop — Smart Waste Management",
+  description: "Sort waste, schedule collections, earn rewards, and build cleaner communities across Sri Lanka.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
