@@ -19,6 +19,26 @@ const categories = [
   { image: "/waste-categories/e-waste.webp", title: "E-Waste", titleSi: "ඉලෙක්ට්‍රොනික කසළ", items: "Old electronics and devices", itemsSi: "පැරණි ඉලෙක්ට්‍රොනික උපකරණ", color: "coral" },
 ];
 
+type CollectionPoint = {
+  id: number;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  distance: string;
+  openingHours: string[];
+  phone?: string;
+  acceptedWaste: string[];
+  verified: boolean;
+  markerClass: string;
+};
+
+const collectionPoints: CollectionPoint[] = [
+  { id: 1, name: "Eco Collection Point — Nugegoda", address: "Sample Address, High Level Road, Nugegoda", latitude: 6.8649, longitude: 79.8997, distance: "1.8 km", openingHours: ["Mon – Sat: 8:00 AM – 6:00 PM", "Sunday: Closed"], phone: "+94 76 000 0001", acceptedWaste: ["Plastic", "Paper", "Metal", "Glass"], verified: true, markerClass: "mp1" },
+  { id: 2, name: "Green Point — Kotte", address: "Sample Address, Parliament Road, Kotte", latitude: 6.8905, longitude: 79.9015, distance: "3.2 km", openingHours: ["Mon – Fri: 9:00 AM – 5:30 PM", "Sat: 9:00 AM – 1:00 PM"], acceptedWaste: ["Paper", "Glass", "E-Waste"], verified: true, markerClass: "mp2" },
+  { id: 3, name: "Eco Drop-off — Maharagama", address: "Sample Address, Town Centre, Maharagama", latitude: 6.8480, longitude: 79.9265, distance: "4.6 km", openingHours: ["Tue – Sun: 8:30 AM – 5:00 PM", "Monday: Closed"], phone: "+94 76 000 0003", acceptedWaste: ["Plastic", "Metal", "E-Waste"], verified: false, markerClass: "mp3" },
+];
+
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [location, setLocation] = useState("");
@@ -26,10 +46,12 @@ export default function Home() {
   const [distance, setDistance] = useState("5");
   const [searched, setSearched] = useState(false);
   const [locationStatus, setLocationStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
-  const [selectedPoint, setSelectedPoint] = useState(1);
+  const [selectedPointId, setSelectedPointId] = useState(1);
   const [language, setLanguage] = useState<"en" | "si">("en");
   const isSi = language === "si";
   const t = (english: string, sinhala: string) => isSi ? sinhala : english;
+  const visibleCollectionPoints = collectionPoints.filter((point) => Number.parseFloat(point.distance) <= Number(distance) && (filters.length === 0 || filters.some((filter) => point.acceptedWaste.includes(filter))));
+  const selectedPoint = visibleCollectionPoints.find((point) => point.id === selectedPointId) ?? visibleCollectionPoints[0] ?? collectionPoints[0];
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -52,8 +74,10 @@ export default function Home() {
         setLocation(value.location);
         setFilters(value.categories);
         setSearched(true);
+        const match = collectionPoints.find((point) => value.categories?.some((category) => point.acceptedWaste.includes(category))) ?? collectionPoints[0];
+        setSelectedPointId(match.id);
         document.querySelector("#collection-points")?.scrollIntoView({ behavior: "smooth" });
-        return { name: "Sample Green Point", sample: true, distance: "2.4 km", open: true, accepts: value.categories };
+        return { name: match.name, sample: true, verified: match.verified, distance: match.distance, address: match.address, openingHours: match.openingHours, accepts: match.acceptedWaste };
       },
     }, { signal: lifecycle.signal });
     void Promise.resolve(registration).catch(() => undefined);
@@ -67,6 +91,7 @@ export default function Home() {
   function submitSearch(event: FormEvent) {
     event.preventDefault();
     setSearched(true);
+    if (visibleCollectionPoints.length) setSelectedPointId(visibleCollectionPoints[0].id);
   }
 
   function useMyLocation() {
@@ -132,8 +157,8 @@ export default function Home() {
         <div className="finder-layout collection-finder"><form className="finder-panel" onSubmit={submitSearch}><h3>🔍 {t("Search your area", "ඔබේ ප්‍රදේශය සොයන්න")}</h3><label><span>{t("LOCATION", "ස්ථානය")}</span><div className="search-input"><i>⌖</i><input value={location} onChange={(e) => setLocation(e.target.value)} placeholder={t("Enter location...", "ස්ථානය ඇතුළත් කරන්න...")} /></div></label><button className="use-location" type="button" onClick={useMyLocation} disabled={locationStatus === "loading"}>📍 {locationStatus === "loading" ? t("Locating...", "ස්ථානය සොයමින්...") : t("Use My Location", "මගේ ස්ථානය භාවිතා කරන්න")}</button>{locationStatus === "error" && <small className="location-error">{t("Location access was unavailable. Search your area instead.", "ස්ථාන ප්‍රවේශය නොලැබුණි. ඔබේ ප්‍රදේශය සොයන්න.")}</small>}
           <fieldset><legend>{t("WASTE TYPE", "කසළ වර්ගය")}</legend>{["Plastic","Paper","Metal","Glass","E-Waste"].map((filter) => <label className="check" key={filter}><input type="checkbox" checked={filters.includes(filter)} onChange={() => toggleFilter(filter)} /><span>{isSi ? ({Plastic:"ප්ලාස්ටික්",Paper:"කඩදාසි",Metal:"ලෝහ",Glass:"වීදුරු","E-Waste":"ඉලෙක්ට්‍රොනික කසළ"} as Record<string,string>)[filter] : filter}</span></label>)}</fieldset>
           <fieldset className="distance-field"><legend>{t("DISTANCE", "දුර")}</legend>{["1","5","10"].map((value) => <label className="check" key={value}><input type="radio" name="distance" value={value} checked={distance === value} onChange={() => setDistance(value)} /><span>{t(`Within ${value} km`, `කි.මී. ${value} ඇතුළත`)}</span></label>)}</fieldset><button className="button search-button" type="submit">{t("Find Nearby", "ආසන්න ස්ථාන සොයන්න")} <span>→</span></button>
-          <div className="nearby-heading"><b>📍 {t("Nearby Collection Points", "ආසන්න එකතු කිරීමේ ස්ථාන")}</b><small>{t("Sample result", "උදාහරණ ප්‍රතිඵලය")}</small></div><div className={searched ? "result-card revealed" : "result-card"}><div className="result-head"><span>♻</span><div><b>{t("Sample Green Point", "උදාහරණ Green Point")}</b><small>2.4 km {t("away", "දුරින්")}</small></div><i>{t("OPEN", "විවෘතයි")}</i></div><p>{t("Plastic · Paper · Metal", "ප්ලාස්ටික් · කඩදාසි · ලෝහ")}</p><button type="button" onClick={() => setSelectedPoint(1)}>{t("Show on map", "සිතියමේ පෙන්වන්න")} <span>↗</span></button></div>
-          </form><div className="fake-map large-map"><div className="map-road r1"></div><div className="map-road r2"></div><div className="map-road r3"></div><span className="map-label ml1">DEMO ZONE A</span><span className="map-label ml2">DEMO ZONE B</span><span className="map-label ml3">DEMO ZONE C</span>{[1,2,3].map((point) => <button type="button" aria-label={`${t("Sample collection point", "උදාහරණ එකතු කිරීමේ ස්ථානය")} ${point}`} className={`map-pin mp${point} ${selectedPoint === point ? "active" : ""}`} onClick={() => setSelectedPoint(point)} key={point}>♻</button>)}<span className="you-pin">📍<small>{t("You", "ඔබ")}</small></span><div className={`map-popup point-${selectedPoint}`}><div><span>♻</span><small>{t("SAMPLE POINT", "උදාහරණ ස්ථානය")}</small></div><b>{t("Green Collection Point", "Green එකතු කිරීමේ ස්ථානය")}</b><p>{t("Plastic • Paper • Metal", "ප්ලාස්ටික් • කඩදාසි • ලෝහ")}</p><strong>{selectedPoint === 1 ? "1.8" : selectedPoint === 2 ? "3.2" : "4.6"} km {t("away", "දුරින්")}</strong><div><button type="button">{t("View Details", "විස්තර")}</button><button type="button">{t("Get Directions", "මාර්ගය බලන්න")} ↗</button></div></div><div className="map-key"><span><i className="green-dot"></i> {t("Sample point", "උදාහරණ ස්ථානය")}</span><span><i className="dark-dot"></i> {t("You", "ඔබ")}</span></div></div></div>
+          <div className="nearby-heading"><b>📍 {t("Nearby Collection Points", "ආසන්න එකතු කිරීමේ ස්ථාන")}</b><small>{t("Sample data", "උදාහරණ දත්ත")}</small></div><div className="result-list">{visibleCollectionPoints.length ? visibleCollectionPoints.map((point) => <button className={`result-card compact-result ${selectedPoint.id === point.id ? "revealed selected" : ""}`} type="button" onClick={() => setSelectedPointId(point.id)} key={point.id}><span>♻</span><span><b>{point.name}</b><small>{point.distance}{" "}{t("away", "දුරින්")} · {point.acceptedWaste.slice(0,2).join(" · ")}</small></span><i>{point.verified ? "✓" : ""}</i></button>) : <div className="no-results">{t("No sample points match these filters.", "මෙම filters වලට ගැළපෙන උදාහරණ ස්ථාන නොමැත.")}</div>}</div>
+          </form><div className="fake-map large-map"><div className="map-road r1"></div><div className="map-road r2"></div><div className="map-road r3"></div><span className="map-label ml1">NUGEGODA</span><span className="map-label ml2">KOTTE</span><span className="map-label ml3">MAHARAGAMA</span>{visibleCollectionPoints.map((point) => <button type="button" aria-label={`${t("Select", "තෝරන්න")} ${point.name}`} className={`map-pin ${point.markerClass} ${selectedPoint.id === point.id ? "active" : ""}`} onClick={() => setSelectedPointId(point.id)} key={point.id}>♻</button>)}<span className="you-pin">📍<small>{t("You", "ඔබ")}</small></span><aside className="collection-details" aria-live="polite"><div className="details-topline"><span className="sample-data-badge">{t("SAMPLE DATA", "උදාහරණ දත්ත")}</span>{selectedPoint.verified ? <span className="verified-badge">✓ {t("Verified Collection Point", "තහවුරු කළ එකතු කිරීමේ ස්ථානය")}</span> : <span className="unverified-badge">{t("Demo point", "Demo ස්ථානය")}</span>}</div><h3>{selectedPoint.name}</h3><div className="detail-row"><span>📍</span><p>{selectedPoint.address}</p></div><div className="detail-row"><span>📏</span><p><b>{selectedPoint.distance}</b>{" "}{t("away", "දුරින්")}</p></div><div className="detail-row"><span>🕐</span><p>{selectedPoint.openingHours.map((hours) => <span key={hours}>{hours}</span>)}</p></div>{selectedPoint.phone && <div className="detail-row"><span>☎</span><p>{t("Sample contact", "උදාහරණ සම්බන්ධතාවය")}: {selectedPoint.phone}</p></div>}<div className="accepted-block"><b>♻️ {t("Accepted Waste", "පිළිගන්නා කසළ")}</b><div>{selectedPoint.acceptedWaste.map((waste) => <span key={waste}>{waste}</span>)}</div></div><div className="detail-actions"><a href={`https://www.google.com/maps/dir/?api=1&destination=${selectedPoint.latitude},${selectedPoint.longitude}`} target="_blank" rel="noreferrer">📍 {t("Get Directions", "මාර්ගය බලන්න")}</a>{selectedPoint.phone && <a href={`tel:${selectedPoint.phone.replace(/\s/g, "")}`}>☎ {t("Contact", "අමතන්න")}</a>}</div></aside><div className="map-key"><span><i className="green-dot"></i> {t("Sample point", "උදාහරණ ස්ථානය")}</span><span><i className="dark-dot"></i> {t("You", "ඔබ")}</span></div></div></div>
       </div></section>
 
       <section className="section rewards" id="rewards">
