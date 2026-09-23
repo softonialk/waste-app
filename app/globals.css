@@ -42,3 +42,10 @@ h1,h2,h3,h4,.logo b{font-family:"Trebuchet MS","Segoe UI Variable Display",sans-
 .hero-actions .button-ghost span{color:var(--lime)}
 @media(max-width:980px){.hero-recycling-visual{min-height:630px}.hero-recycling-image{height:610px;mask-image:linear-gradient(180deg,#000 0%,#000 85%,transparent 100%);object-position:center}.hero-visual-label{left:8%;bottom:7%}}
 @media(max-width:640px){.hero-recycling-visual{min-height:500px}.hero-recycling-image{height:480px;border-radius:20px}.hero-visual-label{left:3%;bottom:4%}.hero-actions{flex-direction:column}.hero-actions .button{width:100%}}
+
+/* How it works refinement */
+.steps-grid{align-items:stretch}.step-card{min-height:250px;padding:27px 25px 25px;display:flex;flex-direction:column}.step-number{font-size:.72rem;letter-spacing:.12em;color:var(--lime)}
+.step-icon{font-size:1.35rem;background:rgba(201,242,91,.1);border:1px solid rgba(201,242,91,.15)}
+.step-card h3{font-size:1.08rem;line-height:1.25;min-height:2.5em;margin-bottom:10px}.step-card p{font-size:.86rem;line-height:1.55;margin:0}
+.step-arrow{top:107px}
+@media(max-width:980px){.step-card h3{min-height:auto}}

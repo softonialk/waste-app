@@ -4,10 +4,10 @@ import Image from "next/image";
 import { FormEvent, useEffect, useState } from "react";
 
 const steps = [
-  { n: "01", icon: "⌘", title: "Sort", text: "Separate recyclable waste according to its category." },
-  { n: "02", icon: "◷", title: "Schedule", text: "Choose a convenient collection date and location." },
-  { n: "03", icon: "▣", title: "Collect", text: "Hand it to a verified collector or collection point." },
-  { n: "04", icon: "✦", title: "Earn", text: "Receive Eco Points and unlock useful rewards." },
+  { n: "01", icon: "♻️", title: "Sort Your Waste", text: "Separate your recyclable waste into the correct categories." },
+  { n: "02", icon: "📅", title: "Schedule a Collection", text: "Choose a convenient time for your waste collection." },
+  { n: "03", icon: "🚛", title: "We Collect", text: "Our collection network collects your sorted recyclable waste." },
+  { n: "04", icon: "🎁", title: "Earn Eco Points", text: "Get points for recycling and redeem them for rewards." },
 ];
 
 const categories = [
