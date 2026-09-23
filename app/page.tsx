@@ -65,24 +65,23 @@ export default function Home() {
         <a className="logo" href="#home"><span className="logo-mark">↻</span><span><b>EcoLoop</b><small>Smart Waste Management</small></span></a>
         <button className="menu-button" aria-label="Toggle menu" onClick={() => setMenuOpen(!menuOpen)}>☰</button>
         <nav className={menuOpen ? "nav-links open" : "nav-links"}>
-          <a href="#home">Home</a><a href="#how">How It Works</a><a href="#categories">Waste Categories</a><a href="#rewards">Rewards</a><a href="#impact">Impact</a>
+          <a href="#home">Home</a><a href="#how">How It Works</a><a href="#categories">Waste Categories</a><a href="#rewards">Rewards</a><a href="#collection-points">Collection Points</a><a href="#impact">Impact</a>
         </nav>
-        <div className="nav-actions"><button className="text-button">Log in</button><a className="button button-small" href="#collection-points">Get Started <span>↗</span></a></div>
+        <div className="nav-actions"><a className="button button-small" href="#collection-points"><span>♻</span> Get Started</a></div>
       </header>
 
       <section className="hero section" id="home">
         <div className="hero-copy">
           <p className="badge"><span>♻</span> Smart Waste Management for a Cleaner Sri Lanka</p>
           <h1>Turn Your Waste Into a <em>Better Tomorrow.</em></h1>
-          <p className="hero-text">Sort your waste, schedule collections, earn rewards, and help build cleaner communities — all from one simple platform.</p>
-          <div className="hero-actions"><a className="button" href="#collection-points">Start Recycling <span>→</span></a><a className="button button-ghost" href="#how">Explore How It Works</a></div>
+          <p className="hero-text">Sort your waste, find nearby collection points, earn rewards, and make a positive impact on Sri Lanka.</p>
+          <div className="hero-actions"><a className="button" href="#categories"><span>♻</span> Start Recycling</a><a className="button button-ghost" href="#collection-points"><span>⌖</span> Find Collection Points</a></div>
           <div className="hero-stats"><div><strong>10K+</strong><span>Households</span></div><div><strong>25K+</strong><span>Items Recycled</span></div><div><strong>50+</strong><span>Collection Points</span></div></div>
         </div>
-        <div className="hero-visual hero-map-visual" aria-label="EcoLoop collection network across Sri Lanka">
-          <div className="hero-map-glow"></div>
-          <Image className="hero-map-image" src="/sri-lanka-eco-map.png" alt="Green three-dimensional map of Sri Lanka with EcoLoop collection points" width={1024} height={1536} priority />
-          <div className="hero-map-chip chip-network"><span>●</span><div><b>50+ active points</b><small>Islandwide network</small></div></div>
-          <div className="hero-map-chip chip-impact"><span>♻</span><div><b>12,540 kg</b><small>Waste recycled</small></div></div>
+        <div className="hero-visual hero-recycling-visual">
+          <div className="hero-visual-glow"></div>
+          <Image className="hero-recycling-image" src="/smart-recycling-sri-lanka.png" alt="Sri Lankan waste collector with sorted recycling bins and a modern collection vehicle" width={1152} height={1376} priority />
+          <div className="hero-visual-label"><span>✓</span><div><b>Smart collection</b><small>Sorted. Scheduled. Rewarded.</small></div></div>
         </div>
       </section>
 
