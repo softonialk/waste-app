@@ -23,7 +23,10 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [location, setLocation] = useState("");
   const [filters, setFilters] = useState(["Plastic", "Paper"]);
+  const [distance, setDistance] = useState("5");
   const [searched, setSearched] = useState(false);
+  const [locationStatus, setLocationStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [selectedPoint, setSelectedPoint] = useState(1);
   const [language, setLanguage] = useState<"en" | "si">("en");
   const isSi = language === "si";
   const t = (english: string, sinhala: string) => isSi ? sinhala : english;
@@ -41,7 +44,7 @@ export default function Home() {
       name: "find_collection_points",
       title: "Find collection points",
       description: "Search EcoLoop collection points by a Sri Lankan location and accepted waste categories.",
-      inputSchema: { type: "object", properties: { location: { type: "string" }, categories: { type: "array", items: { type: "string", enum: ["Plastic", "Paper", "Glass", "Metal"] } } }, required: ["location", "categories"], additionalProperties: false },
+      inputSchema: { type: "object", properties: { location: { type: "string" }, categories: { type: "array", items: { type: "string", enum: ["Plastic", "Paper", "Glass", "Metal", "E-Waste"] } } }, required: ["location", "categories"], additionalProperties: false },
       annotations: { readOnlyHint: true, untrustedContentHint: false },
       execute(input: unknown) {
         const value = input as { location?: string; categories?: string[] };
@@ -50,7 +53,7 @@ export default function Home() {
         setFilters(value.categories);
         setSearched(true);
         document.querySelector("#collection-points")?.scrollIntoView({ behavior: "smooth" });
-        return { name: "Eco Collection Point", distance: "2.4 km", open: true, accepts: value.categories };
+        return { name: "Sample Green Point", sample: true, distance: "2.4 km", open: true, accepts: value.categories };
       },
     }, { signal: lifecycle.signal });
     void Promise.resolve(registration).catch(() => undefined);
@@ -64,6 +67,23 @@ export default function Home() {
   function submitSearch(event: FormEvent) {
     event.preventDefault();
     setSearched(true);
+  }
+
+  function useMyLocation() {
+    if (!navigator.geolocation) {
+      setLocationStatus("error");
+      return;
+    }
+    setLocationStatus("loading");
+    navigator.geolocation.getCurrentPosition(
+      () => {
+        setLocation(t("My current area", "මගේ වත්මන් ප්‍රදේශය"));
+        setLocationStatus("ready");
+        setSearched(true);
+      },
+      () => setLocationStatus("error"),
+      { enableHighAccuracy: false, timeout: 8000 }
+    );
   }
 
   return (
@@ -120,11 +140,13 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="map-section" id="collection-points"><div className="section"><div className="map-title"><p className="kicker">{t("COLLECTION NETWORK", "එකතු කිරීමේ ජාලය")}</p><h2>{t("Find Your Nearest ", "ඔබට ආසන්න ")}<em>{t("Collection Point.", "එකතු කිරීමේ ස්ථානය සොයන්න.")}</em></h2><p>{t("Discover nearby recycling centers and drop-off points around your community.", "ඔබේ ප්‍රදේශයේ ආසන්න ප්‍රතිචක්‍රීකරණ මධ්‍යස්ථාන සහ භාරදීමේ ස්ථාන සොයාගන්න.")}</p></div>
-        <div className="finder-layout"><div className="fake-map"><div className="map-road r1"></div><div className="map-road r2"></div><div className="map-road r3"></div><span className="map-label ml1">NUGEGODA</span><span className="map-label ml2">KOTTE</span><span className="map-label ml3">MAHARAGAMA</span><span className="map-pin mp1">♻</span><span className="map-pin mp2">♻</span><span className="map-pin mp3">♻</span><span className="you-pin">⌂</span><div className="map-key"><span><i className="green-dot"></i> {t("Collection point", "එකතු කිරීමේ ස්ථානය")}</span><span><i className="dark-dot"></i> {t("You are here", "ඔබ මෙහි")}</span></div></div>
-          <form className="finder-panel" onSubmit={submitSearch}><h3>{t("Find a collection point", "එකතු කිරීමේ ස්ථානයක් සොයන්න")}</h3><label><span>{t("YOUR LOCATION", "ඔබේ ස්ථානය")}</span><div className="search-input"><i>⌖</i><input value={location} onChange={(e) => setLocation(e.target.value)} placeholder={t("Search suburb or city...", "නගරය හෝ ප්‍රදේශය සොයන්න...")} /></div></label><fieldset><legend>{t("ACCEPTED WASTE", "පිළිගන්නා කසළ")}</legend>{["Plastic","Paper","Glass","Metal"].map((filter) => <label className="check" key={filter}><input type="checkbox" checked={filters.includes(filter)} onChange={() => toggleFilter(filter)} /><span>{isSi ? ({Plastic:"ප්ලාස්ටික්",Paper:"කඩදාසි",Glass:"වීදුරු",Metal:"ලෝහ"} as Record<string,string>)[filter] : filter}</span></label>)}</fieldset><button className="button search-button" type="submit">{t("Find Nearby", "ආසන්න ස්ථාන සොයන්න")} <span>→</span></button>
-            <div className={searched ? "result-card revealed" : "result-card"}><div className="result-head"><span>♻</span><div><b>{t("Eco Collection Point", "Eco එකතු කිරීමේ ස්ථානය")}</b><small>2.4 km {t("away", "දුරින්")}</small></div><i>{t("OPEN TODAY", "අද විවෘතයි")}</i></div><p>{t("Accepts", "පිළිගනී")}: {filters.length ? filters.join(" · ") : t("General recyclables", "සාමාන්‍ය ප්‍රතිචක්‍රීකරණ ද්‍රව්‍ය")}</p><button type="button">{t("View Details", "විස්තර බලන්න")} <span>↗</span></button></div>
-          </form></div>
+      <section className="map-section" id="collection-points"><div className="section"><div className="map-title"><p className="kicker">{t("COLLECTION POINTS", "එකතු කිරීමේ ස්ථාන")}</p><h2>{t("Find a Collection Point ", "ඔබට ආසන්න එකතු කිරීමේ ස්ථානයක් ")}<em>{t("Near You", "සොයාගන්න")}</em></h2><p>{t("Find nearby waste collection points and choose the most convenient place to recycle your waste.", "ආසන්න කසළ එකතු කිරීමේ ස්ථාන සොයා ඔබේ කසළ ප්‍රතිචක්‍රීකරණයට පහසුම ස්ථානය තෝරන්න.")}</p></div>
+        <div className="sample-notice"><span>●</span><div><b>{t("Sample Collection Points", "උදාහරණ එකතු කිරීමේ ස්ථාන")}</b><small>{t("Demo locations only — verified point data will be added when the collection network launches.", "මෙය demo ස්ථාන පමණි — ජාලය ආරම්භ වූ පසු තහවුරු කළ ස්ථාන එක් කෙරේ.")}</small></div></div>
+        <div className="finder-layout collection-finder"><form className="finder-panel" onSubmit={submitSearch}><h3>🔍 {t("Search your area", "ඔබේ ප්‍රදේශය සොයන්න")}</h3><label><span>{t("LOCATION", "ස්ථානය")}</span><div className="search-input"><i>⌖</i><input value={location} onChange={(e) => setLocation(e.target.value)} placeholder={t("Enter location...", "ස්ථානය ඇතුළත් කරන්න...")} /></div></label><button className="use-location" type="button" onClick={useMyLocation} disabled={locationStatus === "loading"}>📍 {locationStatus === "loading" ? t("Locating...", "ස්ථානය සොයමින්...") : t("Use My Location", "මගේ ස්ථානය භාවිතා කරන්න")}</button>{locationStatus === "error" && <small className="location-error">{t("Location access was unavailable. Search your area instead.", "ස්ථාන ප්‍රවේශය නොලැබුණි. ඔබේ ප්‍රදේශය සොයන්න.")}</small>}
+          <fieldset><legend>{t("WASTE TYPE", "කසළ වර්ගය")}</legend>{["Plastic","Paper","Metal","Glass","E-Waste"].map((filter) => <label className="check" key={filter}><input type="checkbox" checked={filters.includes(filter)} onChange={() => toggleFilter(filter)} /><span>{isSi ? ({Plastic:"ප්ලාස්ටික්",Paper:"කඩදාසි",Metal:"ලෝහ",Glass:"වීදුරු","E-Waste":"ඉලෙක්ට්‍රොනික කසළ"} as Record<string,string>)[filter] : filter}</span></label>)}</fieldset>
+          <fieldset className="distance-field"><legend>{t("DISTANCE", "දුර")}</legend>{["1","5","10"].map((value) => <label className="check" key={value}><input type="radio" name="distance" value={value} checked={distance === value} onChange={() => setDistance(value)} /><span>{t(`Within ${value} km`, `කි.මී. ${value} ඇතුළත`)}</span></label>)}</fieldset><button className="button search-button" type="submit">{t("Find Nearby", "ආසන්න ස්ථාන සොයන්න")} <span>→</span></button>
+          <div className="nearby-heading"><b>📍 {t("Nearby Collection Points", "ආසන්න එකතු කිරීමේ ස්ථාන")}</b><small>{t("Sample result", "උදාහරණ ප්‍රතිඵලය")}</small></div><div className={searched ? "result-card revealed" : "result-card"}><div className="result-head"><span>♻</span><div><b>{t("Sample Green Point", "උදාහරණ Green Point")}</b><small>2.4 km {t("away", "දුරින්")}</small></div><i>{t("OPEN", "විවෘතයි")}</i></div><p>{t("Plastic · Paper · Metal", "ප්ලාස්ටික් · කඩදාසි · ලෝහ")}</p><button type="button" onClick={() => setSelectedPoint(1)}>{t("Show on map", "සිතියමේ පෙන්වන්න")} <span>↗</span></button></div>
+          </form><div className="fake-map large-map"><div className="map-road r1"></div><div className="map-road r2"></div><div className="map-road r3"></div><span className="map-label ml1">DEMO ZONE A</span><span className="map-label ml2">DEMO ZONE B</span><span className="map-label ml3">DEMO ZONE C</span>{[1,2,3].map((point) => <button type="button" aria-label={`${t("Sample collection point", "උදාහරණ එකතු කිරීමේ ස්ථානය")} ${point}`} className={`map-pin mp${point} ${selectedPoint === point ? "active" : ""}`} onClick={() => setSelectedPoint(point)} key={point}>♻</button>)}<span className="you-pin">📍<small>{t("You", "ඔබ")}</small></span><div className={`map-popup point-${selectedPoint}`}><div><span>♻</span><small>{t("SAMPLE POINT", "උදාහරණ ස්ථානය")}</small></div><b>{t("Green Collection Point", "Green එකතු කිරීමේ ස්ථානය")}</b><p>{t("Plastic • Paper • Metal", "ප්ලාස්ටික් • කඩදාසි • ලෝහ")}</p><strong>{selectedPoint === 1 ? "1.8" : selectedPoint === 2 ? "3.2" : "4.6"} km {t("away", "දුරින්")}</strong><div><button type="button">{t("View Details", "විස්තර")}</button><button type="button">{t("Get Directions", "මාර්ගය බලන්න")} ↗</button></div></div><div className="map-key"><span><i className="green-dot"></i> {t("Sample point", "උදාහරණ ස්ථානය")}</span><span><i className="dark-dot"></i> {t("You", "ඔබ")}</span></div></div></div>
       </div></section>
 
       <section className="section impact" id="impact"><div className="impact-copy"><p className="kicker">{t("OUR COLLECTIVE IMPACT", "අපගේ සාමූහික බලපෑම")}</p><h2>{t("Every Small Action Creates an ", "සෑම කුඩා ක්‍රියාවක්ම ")}<em>{t("Impact.", "බලපෑමක් ඇති කරයි.")}</em></h2><p>{t("When households, collectors and communities work together, everyday habits become measurable progress.", "නිවාස, එකතු කරන්නන් සහ ප්‍රජාවන් එක්ව කටයුතු කළ විට දෛනික පුරුදු මැනිය හැකි ප්‍රගතියක් බවට පත්වේ.")}</p><div className="impact-stats"><div><strong>12,540 <small>kg</small></strong><span>{t("Waste recycled", "ප්‍රතිචක්‍රීකරණය කළ කසළ")}</span></div><div><strong>8,230</strong><span>{t("Households participating", "සහභාගී වන නිවාස")}</span></div><div><strong>4,850 <small>kg</small></strong><span>{t("Plastic diverted", "ඉවත් කළ ප්ලාස්ටික්")}</span></div><div><strong>1,240</strong><span>{t("Collections completed", "සම්පූර්ණ කළ එකතු කිරීම්")}</span></div></div></div><div className="impact-circle"><div className="outer-ring"><div><span>♻</span><strong>12,540</strong><small>{t("KG RECYCLED", "KG ප්‍රතිචක්‍රීකරණය කළා")}<br/>{t("THIS MONTH", "මේ මාසයේ")}</small></div></div><span className="ring-note one">72% {t("monthly goal", "මාසික ඉලක්කය")}</span><span className="ring-note two">↗ 18% {t("vs last month", "පසුගිය මාසයට වඩා")}</span></div></section>
