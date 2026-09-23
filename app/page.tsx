@@ -11,12 +11,12 @@ const steps = [
 ];
 
 const categories = [
-  { icon: "🧴", title: "Plastic", items: "Bottles, containers, packaging", color: "mint" },
-  { icon: "📄", title: "Paper", items: "Newspapers, cardboard, paper", color: "sand" },
-  { icon: "🥫", title: "Metal", items: "Cans, tins, metal items", color: "blue" },
-  { icon: "🍾", title: "Glass", items: "Glass bottles and jars", color: "aqua" },
-  { icon: "🌱", title: "Organic", items: "Food and garden waste", color: "lime" },
-  { icon: "💻", title: "E-Waste", items: "Old electronics and devices", color: "coral" },
+  { image: "/waste-categories/plastic.png", title: "Plastic", items: "Bottles, containers, packaging", color: "mint" },
+  { image: "/waste-categories/paper.png", title: "Paper", items: "Newspapers, cardboard, paper", color: "sand" },
+  { image: "/waste-categories/metal.png", title: "Metal", items: "Cans, tins, metal items", color: "blue" },
+  { image: "/waste-categories/glass.png", title: "Glass", items: "Glass bottles and jars", color: "aqua" },
+  { image: "/waste-categories/organic.png", title: "Organic", items: "Food and garden waste", color: "lime" },
+  { image: "/waste-categories/e-waste.png", title: "E-Waste", items: "Old electronics and devices", color: "coral" },
 ];
 
 export default function Home() {
@@ -95,7 +95,7 @@ export default function Home() {
 
       <section className="category-section" id="categories"><div className="section">
         <div className="section-heading-row"><div><p className="kicker">WASTE CATEGORIES</p><h2>Know Your <em>Waste.</em></h2></div><p>Quickly identify the right category before you request a pickup. Accepted categories may vary by collector or collection point.</p></div>
-        <div className="category-grid">{categories.map((category) => <article className={`category-card ${category.color}`} key={category.title}><span className="category-icon">{category.icon}</span><div><h3>{category.title}</h3><p>{category.items}</p></div></article>)}</div>
+        <div className="category-grid">{categories.map((category) => <article className={`category-card ${category.color}`} key={category.title}><div className="category-thumb"><Image src={category.image} alt={`${category.title} recyclable waste`} width={240} height={240} /></div><div><h3>{category.title}</h3><p>{category.items}</p></div></article>)}</div>
         <div className="tip-bar"><span>?</span><div><b>Not sure where your waste belongs?</b><p>Use our waste guide to find the correct category.</p></div><button>Find Waste Category <span>→</span></button></div>
       </div></section>
 

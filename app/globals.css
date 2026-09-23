@@ -53,3 +53,6 @@ h1,h2,h3,h4,.logo b{font-family:"Trebuchet MS","Segoe UI Variable Display",sans-
 /* Waste category refinement */
 .category-card{min-height:165px;grid-template-columns:68px 1fr;align-items:center;padding:24px}.category-icon{width:64px;height:64px;border-radius:18px;font-size:1.75rem}.category-card h3{font-size:1.08rem;margin:0 0 9px}.category-card p{font-size:.82rem;line-height:1.55}.tip-bar>span{font-size:1rem;font-weight:900;color:var(--lime);background:rgba(201,242,91,.1);border:1px solid rgba(201,242,91,.16)}.tip-bar button{font-size:.82rem;cursor:pointer}.tip-bar button span{margin-left:6px}
 @media(max-width:640px){.category-card{min-height:145px}.category-icon{width:58px;height:58px;font-size:1.55rem}}
+
+.category-card{grid-template-columns:92px 1fr;overflow:hidden}.category-thumb{width:88px;height:88px;border-radius:18px;overflow:hidden;border:1px solid rgba(201,242,91,.14);background:#0b1512;box-shadow:0 12px 28px rgba(0,0,0,.22)}.category-thumb img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .28s ease}.category-card:hover .category-thumb img{transform:scale(1.06)}
+@media(max-width:640px){.category-card{grid-template-columns:78px 1fr}.category-thumb{width:74px;height:74px;border-radius:15px}}
