@@ -3,14 +3,12 @@
 import Image from "next/image";
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { EcoPointsCalculator, RewardsMarketplace } from "./components/platform-features";
-import { pointsRules } from "./data/platform";
 
 const steps = [
   { n: "01", icon: "♻️", title: "Sort Your Waste", titleSi: "කසළ වෙන් කරන්න", text: "Separate your recyclable waste into the correct categories.", textSi: "ප්‍රතිචක්‍රීකරණය කළ හැකි කසළ නිවැරදි කාණ්ඩවලට වෙන් කරන්න." },
   { n: "02", icon: "📅", title: "Schedule a Collection", titleSi: "එකතු කිරීම සැලසුම් කරන්න", text: "Choose a convenient time for your waste collection.", textSi: "කසළ එකතු කිරීමට ඔබට පහසු වේලාවක් තෝරන්න." },
   { n: "03", icon: "🚛", title: "We Collect", titleSi: "අපි එකතු කරමු", text: "Our collection network collects your sorted recyclable waste.", textSi: "අපගේ ජාලය ඔබ වෙන් කළ කසළ නිවසින්ම එකතු කරයි." },
-  { n: "04", icon: "🎁", title: "Earn Eco Points", titleSi: "Eco Points උපයන්න", text: "Get points for recycling and redeem them for rewards.", textSi: "ප්‍රතිචක්‍රීකරණයට ලකුණු ලබාගෙන ත්‍යාග සඳහා භාවිතා කරන්න." },
+  { n: "04", icon: "🪙", title: "Collector Earns Coins", titleSi: "එකතු කරන්නා Coins උපයයි", text: "The verified collector earns 100 coins after completing the pickup.", textSi: "එකතු කිරීම අවසන් කළ පසු තහවුරු කළ එකතු කරන්නාට coins 100ක් ලැබේ." },
 ];
 
 const categories = [
@@ -58,7 +56,6 @@ export default function Home() {
   const [location, setLocation] = useState("");
   const [filters, setFilters] = useState(["Plastic", "Paper & Cardboard"]);
   const [distance, setDistance] = useState("5");
-  const [searched, setSearched] = useState(false);
   const [locationStatus, setLocationStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [locationError, setLocationError] = useState("");
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -90,7 +87,6 @@ export default function Home() {
         if (!value.location?.trim() || !Array.isArray(value.categories)) throw new Error("Enter a location and category list.");
         setLocation(value.location);
         setFilters(value.categories);
-        setSearched(true);
         const match = collectionPoints.find((point) => value.categories?.some((category) => point.acceptedWaste.includes(category))) ?? collectionPoints[0];
         setSelectedPointId(match.id);
         document.querySelector("#collection-points")?.scrollIntoView({ behavior: "smooth" });
@@ -107,7 +103,6 @@ export default function Home() {
 
   function submitSearch(event: FormEvent) {
     event.preventDefault();
-    setSearched(true);
     if (visibleCollectionPoints.length) setSelectedPointId(visibleCollectionPoints[0].id);
   }
 
@@ -125,7 +120,6 @@ export default function Home() {
         setUserLocation(current);
         setLocation(t("Current browser location", "වත්මන් browser ස්ථානය"));
         setLocationStatus("ready");
-        setSearched(true);
         const nearest = [...collectionPoints].sort((a, b) => distanceKm(current, a) - distanceKm(current, b))[0];
         setSelectedPointId(nearest.id);
       },
@@ -149,7 +143,7 @@ export default function Home() {
           <a href="#home">{t("Home", "මුල් පිටුව")}</a><a href="#how">{t("How It Works", "ක්‍රියා කරන ආකාරය")}</a><a href="#categories">{t("Waste Categories", "කසළ වර්ග")}</a><a href="#collection-points">{t("Collection Points", "එකතු කිරීමේ ස්ථාන")}</a><a href="#rewards">{t("Rewards", "ත්‍යාග")}</a><a href="#impact">{t("Impact", "බලපෑම")}</a>
         </nav>
         <button className="language-toggle" onClick={() => setLanguage(isSi ? "en" : "si")} aria-label={t("Switch to Sinhala", "ඉංග්‍රීසි භාෂාවට මාරු වන්න")}><span className={!isSi ? "active" : ""}>EN</span><i></i><span className={isSi ? "active" : ""}>සිං</span></button>
-        <div className="nav-actions"><Link className="dashboard-link" href="/dashboard">{t("Dashboard", "ඩෑෂ්බෝඩ්")}</Link><a className="button button-small" href="#collection-points"><span>♻</span> {t("Get Started", "ආරම්භ කරන්න")}</a></div>
+        <div className="nav-actions"><Link className="dashboard-link" href="/system">{t("Open System", "පද්ධතිය අරින්න")}</Link><Link className="button button-small" href="/system"><span>♻</span> {t("Get Started", "ආරම්භ කරන්න")}</Link></div>
       </header>
 
       <section className="hero section" id="home">
@@ -157,7 +151,7 @@ export default function Home() {
           <p className="badge"><span>♻</span> {t("Smart Waste Management for a Cleaner Sri Lanka", "පිරිසිදු ශ්‍රී ලංකාවක් සඳහා බුද්ධිමත් කසළ කළමනාකරණය")}</p>
           <h1>{t("Turn Your Waste Into a", "ඔබේ කසළ")}{" "}<em>{t("Better Tomorrow.", "හොඳ හෙටක් බවට පත් කරන්න.")}</em></h1>
           <p className="hero-text">{t("Sort your waste, find nearby collection points, earn rewards, and make a positive impact on Sri Lanka.", "කසළ වෙන් කරන්න, ආසන්න එකතු කිරීමේ ස්ථාන සොයන්න, ත්‍යාග උපයාගෙන ශ්‍රී ලංකාවට යහපත් බලපෑමක් ඇති කරන්න.")}</p>
-          <div className="hero-actions"><a className="button" href="#categories"><span>♻</span> {t("Start Recycling", "ප්‍රතිචක්‍රීකරණය අරඹන්න")}</a><a className="button button-ghost" href="#collection-points"><span>⌖</span> {t("Find Collection Points", "එකතු කිරීමේ ස්ථාන සොයන්න")}</a></div>
+          <div className="hero-actions"><Link className="button" href="/system?role=household"><span>♻</span> {t("Request a Pickup", "එකතු කිරීමක් ඉල්ලන්න")}</Link><Link className="button button-ghost" href="/system?role=collector"><span>🚛</span> {t("Collector Portal", "එකතු කරන්නාගේ පිටුව")}</Link></div>
           <div className="hero-stats"><div><strong>10K+</strong><span>{t("Households", "නිවාස")}</span></div><div><strong>25K+</strong><span>{t("Items Recycled", "ප්‍රතිචක්‍රීකරණය කළ දෑ")}</span></div><div><strong>50+</strong><span>{t("Collection Points", "එකතු කිරීමේ ස්ථාන")}</span></div></div>
         </div>
         <div className="hero-visual hero-map-visual" aria-label="EcoLoop collection network across Sri Lanka">
@@ -178,9 +172,7 @@ export default function Home() {
       <section className="category-section" id="categories"><div className="section">
         <div className="section-heading-row"><div><p className="kicker">{t("WASTE CATEGORIES", "කසළ වර්ග")}</p><h2>{t("Know Your", "ඔබේ කසළ")}{" "}<em>{t("Waste.", "හඳුනාගන්න.")}</em></h2></div><p>{t("Quickly identify the right category before you request a pickup. Accepted categories may vary by collector or collection point.", "එකතු කිරීමක් ඉල්ලීමට පෙර නිවැරදි කාණ්ඩය හඳුනාගන්න. පිළිගන්නා කාණ්ඩ එකතු කරන්නා හෝ ස්ථානය අනුව වෙනස් විය හැක.")}</p></div>
         <div className="category-grid">{categories.map((category) => <article className={`category-card ${category.color}`} key={category.title}><div className="category-thumb"><Image src={category.image} alt={`${category.title} recyclable waste`} width={240} height={240} /></div><div><h3>{isSi ? category.titleSi : category.title}</h3><p>{isSi ? category.itemsSi : category.items}</p></div></article>)}</div>
-        <div className="waste-pathways"><article><span>♻️</span><div><small>{t("RECYCLABLE PATHWAY", "ප්‍රතිචක්‍රීකරණ මාර්ගය")}</small><h3>{t("Recyclable Waste", "ප්‍රතිචක්‍රීකරණ කසළ")}</h3><p>Plastic · Paper & Cardboard · Metal · Glass · E-Waste</p><b>{t("Sort → Collect → Recycle → Eco Points", "වෙන් කරන්න → එකතු කරන්න → ප්‍රතිචක්‍රීකරණය → Eco Points")}</b></div></article><article><span>🌿</span><div><small>{t("SEPARATE ORGANIC PATHWAY", "වෙනම කාබනික මාර්ගය")}</small><h3>{t("Organic Waste", "කාබනික කසළ")}</h3><p>{t("Food waste · Garden waste · Compostable waste", "ආහාර · ගෙවතු · කොම්පෝස්ට් කළ හැකි කසළ")}</p><b>{t("Separate → Composting / Organic Collection → Compost", "වෙන් කරන්න → කොම්පෝස්ට් / කාබනික එකතු කිරීම → කොම්පෝස්ට්")}</b></div></article></div>
-        <div className="points-rules"><div><span className="demo-tag">{t("DEMO POINT RULES", "උදාහරණ ලකුණු නීති")}</span><h3>{t("Eco Points per verified kilogram", "තහවුරු කළ කිලෝග්‍රෑමයකට Eco Points")}</h3></div>{Object.entries(pointsRules).map(([name, points]) => <article key={name}><b>{name}</b><strong>{points}</strong><small>Eco Points / kg</small></article>)}</div>
-        <EcoPointsCalculator />
+        <div className="waste-pathways"><article><span>♻️</span><div><small>{t("RECYCLABLE PATHWAY", "ප්‍රතිචක්‍රීකරණ මාර්ගය")}</small><h3>{t("Recyclable Waste", "ප්‍රතිචක්‍රීකරණ කසළ")}</h3><p>Plastic · Paper & Cardboard · Metal · Glass · E-Waste</p><b>{t("Sort → Request → Collect → Recycle", "වෙන් කරන්න → ඉල්ලන්න → එකතු කරන්න → ප්‍රතිචක්‍රීකරණය")}</b></div></article><article><span>🌿</span><div><small>{t("SEPARATE ORGANIC PATHWAY", "වෙනම කාබනික මාර්ගය")}</small><h3>{t("Organic Waste", "කාබනික කසළ")}</h3><p>{t("Food waste · Garden waste · Compostable waste", "ආහාර · ගෙවතු · කොම්පෝස්ට් කළ හැකි කසළ")}</p><b>{t("Separate → Composting / Organic Collection → Compost", "වෙන් කරන්න → කොම්පෝස්ට් / කාබනික එකතු කිරීම → කොම්පෝස්ට්")}</b></div></article></div>
         <div className="tip-bar"><span>?</span><div><b>{t("Not sure where your waste belongs?", "ඔබේ කසළ අයත් කාණ්ඩය විශ්වාස නැද්ද?")}</b><p>{t("Use our waste guide to find the correct category.", "නිවැරදි කාණ්ඩය සොයාගැනීමට අපගේ කසළ මාර්ගෝපදේශය භාවිතා කරන්න.")}</p></div><button>{t("Find Waste Category", "කසළ කාණ්ඩය සොයන්න")} <span>→</span></button></div>
       </div></section>
 
@@ -196,16 +188,15 @@ export default function Home() {
       <section className="section rewards" id="rewards">
         <div className="rewards-dashboard">
           <div className="dashboard-label"><span>●</span>{t("SAMPLE DASHBOARD", "උදාහරණ ඩෑෂ්බෝඩ්")}</div>
-          <div className="dashboard-head"><div><small>{t("YOUR ECO POINTS", "ඔබේ ECO POINTS")}</small><strong>1,250 <i>🌿</i></strong></div><span>♻</span></div>
-          <div className="next-reward"><div><b>{t("Next reward", "ඊළඟ ත්‍යාගය")}</b><strong>1,500 pts</strong></div><div className="reward-progress"><i></i></div><div className="progress-meta"><span>83%</span><span>{t("250 points to go", "තවත් ලකුණු 250යි")}</span></div></div>
-          <p className="dashboard-note">{t("Illustrative balance — your real points will appear after the rewards system launches.", "මෙය උදාහරණ ශේෂයකි — ත්‍යාග පද්ධතිය ආරම්භ වූ පසු ඔබේ සැබෑ ලකුණු මෙහි පෙන්වයි.")}</p>
+          <div className="dashboard-head"><div><small>{t("COLLECTOR COINS", "එකතු කරන්නාගේ COINS")}</small><strong>100 <i>🪙</i></strong></div><span>🚛</span></div>
+          <div className="next-reward"><div><b>{t("First collector reward", "පළමු collector ත්‍යාගය")}</b><strong>500 coins</strong></div><div className="reward-progress"><i style={{width:"20%"}}></i></div><div className="progress-meta"><span>1 pickup</span><span>{t("5 pickups required", "pickups 5ක් අවශ්‍යයි")}</span></div></div>
+          <p className="dashboard-note">{t("Households request pickups for free. Only verified collectors earn these coins.", "නිවාස pickup requests දාන්නේ නොමිලේය. මෙම coins උපයන්නේ තහවුරු කළ එකතු කරන්නන් පමණි.")}</p>
         </div>
-        <div className="rewards-copy rewards-detail"><p className="kicker">{t("ECO REWARDS", "ECO ත්‍යාග")}</p><h2>{t("Recycle More.", "වැඩිපුර ප්‍රතිචක්‍රීකරණය කරන්න.")}{" "}<em>{t("Earn More.", "වැඩිපුර උපයන්න.")}</em></h2><p>{t("Every time you recycle, you make an impact and earn Eco Points.", "ඔබ ප්‍රතිචක්‍රීකරණය කරන සෑම වාරයකදීම යහපත් බලපෑමක් ඇති කර Eco Points උපයයි.")}</p>
-          <div className="reward-flow"><article><span>♻️</span><div><b>{t("Recycle", "ප්‍රතිචක්‍රීකරණය")}</b><p>{t("Drop off or hand over eligible recyclable waste.", "සුදුසු කසළ භාර දෙන්න හෝ එකතු කරන්නාට ලබා දෙන්න.")}</p></div></article><i>→</i><article><span>⭐</span><div><b>{t("Earn Points", "ලකුණු උපයන්න")}</b><p>{t("Receive Eco Points based on your recycling activity.", "ඔබේ ප්‍රතිචක්‍රීකරණ ක්‍රියාකාරකම් අනුව Eco Points ලබාගන්න.")}</p></div></article><i>→</i><article><span>🎁</span><div><b>{t("Redeem", "භාවිතා කරන්න")}</b><p>{t("Use your points to claim available rewards.", "ලබාගත හැකි ත්‍යාග සඳහා ඔබේ ලකුණු භාවිතා කරන්න.")}</p></div></article></div>
-          <div className="reward-examples"><div className="reward-examples-head"><b>{t("Example Rewards", "උදාහරණ ත්‍යාග")}</b><small>{t("Preview only", "උදාහරණයක් පමණි")}</small></div><div><span>🌱 {t("Eco Gift", "Eco ත්‍යාගය")}</span><b>500 pts</b></div><div><span>🛍️ {t("Shopping Voucher", "සාප්පු වවුචරය")}</span><b>1,000 pts</b></div><div><span>🎁 {t("Special Reward", "විශේෂ ත්‍යාගය")}</span><b>2,000 pts</b></div><p>{t("Point values are examples and may change when the rewards system is finalized.", "ලකුණු අගයන් උදාහරණ වන අතර ත්‍යාග පද්ධතිය අවසන් කරන විට වෙනස් විය හැක.")}</p></div>
+        <div className="rewards-copy rewards-detail"><p className="kicker">{t("COLLECTOR REWARDS", "එකතු කරන්නන්ගේ ත්‍යාග")}</p><h2>{t("Collect More.", "වැඩිපුර එකතු කරන්න.")}{" "}<em>{t("Earn More.", "වැඩිපුර උපයන්න.")}</em></h2><p>{t("Verified collectors earn 100 coins after every completed pickup. Household requests remain free.", "තහවුරු කළ එකතු කරන්නන්ට සම්පූර්ණ කළ සෑම pickup එකකටම coins 100ක් ලැබේ. නිවාසවල requests නොමිලේය.")}</p>
+          <div className="reward-flow"><article><span>📲</span><div><b>{t("Accept", "භාරගන්න")}</b><p>{t("Choose an available household request.", "නිවසක request එකක් තෝරන්න.")}</p></div></article><i>→</i><article><span>🚛</span><div><b>{t("Complete", "සම්පූර්ණ කරන්න")}</b><p>{t("Collect the waste and record its weight.", "කසළ එකතු කර බර සටහන් කරන්න.")}</p></div></article><i>→</i><article><span>🪙</span><div><b>{t("Earn Coins", "Coins උපයන්න")}</b><p>{t("Get 100 coins for the completed job.", "සම්පූර්ණ කළ රැකියාවට coins 100ක් ගන්න.")}</p></div></article></div>
+          <div className="reward-examples"><div className="reward-examples-head"><b>{t("Collector Rewards", "Collector ත්‍යාග")}</b><small>{t("Working system", "ක්‍රියාකාරී පද්ධතිය")}</small></div><div><span>🌱 {t("Eco Gift Pack", "Eco ත්‍යාග පැකේජය")}</span><b>500 coins</b></div><div><span>🛍️ {t("Shopping Voucher", "සාප්පු වවුචරය")}</span><b>1,000 coins</b></div><div><span>🎁 {t("Special Reward", "විශේෂ ත්‍යාගය")}</span><b>1,500 coins</b></div><p>{t("Collectors can redeem these rewards from the working portal.", "එකතු කරන්නන්ට ක්‍රියාකාරී portal එකෙන් මෙම ත්‍යාග ලබාගත හැක.")}</p></div>
         </div>
       </section>
-      <section className="section reward-market-section"><RewardsMarketplace /></section>
 
       <section className="impact-section" id="impact"><div className="section"><div className="impact-heading"><div><p className="kicker">{t("OUR COLLECTIVE IMPACT", "අපගේ සාමූහික බලපෑම")}</p><h2>{t("Together, We Make", "එක්ව අපි")}{" "}<em>{t("an Impact", "වෙනසක් ඇති කරමු")}</em></h2></div><p>{t("Every recycled item contributes to a cleaner community and a more sustainable Sri Lanka.", "ප්‍රතිචක්‍රීකරණය කරන සෑම ද්‍රව්‍යයක්ම පිරිසිදු ප්‍රජාවකට සහ තිරසර ශ්‍රී ලංකාවකට දායක වේ.")}</p></div>
         <div className="impact-sample-label"><span>●</span><div><b>{t("SAMPLE DATA", "උදාහරණ දත්ත")}</b><small>{t("These figures illustrate the future dashboard and are not live platform statistics.", "මෙම සංඛ්‍යා අනාගත dashboard එක නිරූපණය කරන අතර සජීවී platform දත්ත නොවේ.")}</small></div></div>

@@ -42,3 +42,5 @@ next-env.d.ts
 
 # Sites local helpers
 .sites-runtime/
+.wrangler/
+dist/
