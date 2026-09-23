@@ -49,3 +49,7 @@ h1,h2,h3,h4,.logo b{font-family:"Trebuchet MS","Segoe UI Variable Display",sans-
 .step-card h3{font-size:1.08rem;line-height:1.25;min-height:2.5em;margin-bottom:10px}.step-card p{font-size:.86rem;line-height:1.55;margin:0}
 .step-arrow{top:107px}
 @media(max-width:980px){.step-card h3{min-height:auto}}
+
+/* Waste category refinement */
+.category-card{min-height:165px;grid-template-columns:68px 1fr;align-items:center;padding:24px}.category-icon{width:64px;height:64px;border-radius:18px;font-size:1.75rem}.category-card h3{font-size:1.08rem;margin:0 0 9px}.category-card p{font-size:.82rem;line-height:1.55}.tip-bar>span{font-size:1rem;font-weight:900;color:var(--lime);background:rgba(201,242,91,.1);border:1px solid rgba(201,242,91,.16)}.tip-bar button{font-size:.82rem;cursor:pointer}.tip-bar button span{margin-left:6px}
+@media(max-width:640px){.category-card{min-height:145px}.category-icon{width:58px;height:58px;font-size:1.55rem}}
