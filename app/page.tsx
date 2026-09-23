@@ -78,10 +78,11 @@ export default function Home() {
           <div className="hero-actions"><a className="button" href="#categories"><span>♻</span> Start Recycling</a><a className="button button-ghost" href="#collection-points"><span>⌖</span> Find Collection Points</a></div>
           <div className="hero-stats"><div><strong>10K+</strong><span>Households</span></div><div><strong>25K+</strong><span>Items Recycled</span></div><div><strong>50+</strong><span>Collection Points</span></div></div>
         </div>
-        <div className="hero-visual hero-recycling-visual">
-          <div className="hero-visual-glow"></div>
-          <Image className="hero-recycling-image" src="/smart-recycling-sri-lanka.png" alt="Sri Lankan waste collector with sorted recycling bins and a modern collection vehicle" width={1152} height={1376} priority />
-          <div className="hero-visual-label"><span>✓</span><div><b>Smart collection</b><small>Sorted. Scheduled. Rewarded.</small></div></div>
+        <div className="hero-visual hero-map-visual" aria-label="EcoLoop collection network across Sri Lanka">
+          <div className="hero-map-glow"></div>
+          <Image className="hero-map-image" src="/sri-lanka-eco-map.png" alt="Green three-dimensional map of Sri Lanka with EcoLoop collection points" width={1024} height={1536} priority />
+          <div className="hero-map-chip chip-network"><span>●</span><div><b>50+ active points</b><small>Islandwide network</small></div></div>
+          <div className="hero-map-chip chip-impact"><span>♻</span><div><b>12,540 kg</b><small>Waste recycled</small></div></div>
         </div>
       </section>
 
