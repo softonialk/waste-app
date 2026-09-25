@@ -20,11 +20,11 @@ Collections and indexes are created automatically on first connection.
 
 | Name | Purpose |
 |---|---|
-| `MONGODB_URI` | MongoDB connection string, e.g. from MongoDB Atlas |
-| `MONGODB_DB` | Database name (optional, defaults to `ecoloop`) |
-| `ADMIN_PASSWORD` | Admin portal password |
-| `ADMIN_SESSION_TOKEN` | Long random string (`openssl rand -hex 32`) |
-| `RATE_LIMIT_SALT` | Long random string (`openssl rand -hex 32`) |
+| `MONGODB_URI` | **Required.** MongoDB connection string, e.g. from MongoDB Atlas |
+| `MONGODB_DB` | Optional. Database name (defaults to `ecoloop`) |
+| `ADMIN_PASSWORD` | Optional. Enables the admin portal, which is needed to verify collectors |
+| `ADMIN_SESSION_TOKEN` | Optional. Derived from `MONGODB_URI` and the admin password when unset |
+| `RATE_LIMIT_SALT` | Optional. Derived from `MONGODB_URI` when unset |
 
 ## Deploy on Vercel
 
@@ -32,7 +32,7 @@ Collections and indexes are created automatically on first connection.
    Marketplace, which sets `MONGODB_URI` for you. In Atlas **Network Access**,
    allow `0.0.0.0/0`, since Vercel functions do not use fixed IP addresses.
 2. Import the repository in Vercel (framework preset: Next.js) and add the
-   environment variables above for Production.
+   `MONGODB_URI` (and optionally the other variables above) for Production.
 3. In **Project → Settings → Domains**, add `www.nextgen.mom` and `nextgen.mom`
    (redirect `nextgen.mom` to `www.nextgen.mom`), then add the DNS records
    Vercel shows at your domain registrar.
