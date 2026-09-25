@@ -5,6 +5,7 @@ type NominatimResult = { lat?: string; lon?: string; display_name?: string };
 export async function GET(request: Request) {
   const query = new URL(request.url).searchParams.get("q")?.trim();
   if (!query) return Response.json({ error: "Enter a Sri Lankan location." }, { status: 400 });
+  if (query.length > 120) return Response.json({ error: "Location search is too long." }, { status: 400 });
 
   const url = new URL("https://nominatim.openstreetmap.org/search");
   url.searchParams.set("q", `${query}, Sri Lanka`);

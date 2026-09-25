@@ -15,6 +15,7 @@ export const collectionRequests = sqliteTable("collection_requests", {
   collectorName: text("collector_name"),
   recordedWeight: real("recorded_weight"),
   coinsAwarded: integer("coins_awarded").notNull().default(0),
+  ownerHash: text("owner_hash"),
   createdAt: text("created_at").notNull(),
 });
 
@@ -25,6 +26,7 @@ export const collectors = sqliteTable("collectors", {
   serviceArea: text("service_area").notNull(),
   organization: text("organization").notNull().default("Independent Collector"),
   verificationStatus: text("verification_status").notNull().default("Verification Pending"),
+  accessKeyHash: text("access_key_hash"),
   createdAt: text("created_at").notNull(),
 });
 

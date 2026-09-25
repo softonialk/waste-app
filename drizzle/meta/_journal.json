@@ -15,6 +15,13 @@
       "when": 1790319316365,
       "tag": "0001_uneven_xorn",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790335857567,
+      "tag": "0002_security_sessions",
+      "breakpoints": true
     }
   ]
 }
