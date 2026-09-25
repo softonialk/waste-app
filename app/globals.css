@@ -71,6 +71,11 @@ html[lang="si"] h1,html[lang="si"] h2{line-height:1.25;letter-spacing:-.035em}
 /* Form validation feedback */
 .system-form input:not(:placeholder-shown):invalid,.system-form textarea:not(:placeholder-shown):invalid,.system-form select:invalid{border-color:#c55345;background:#fff7f5}.system-form input:focus:invalid,.system-form textarea:focus:invalid{outline:2px solid rgba(197,83,69,.18)}.form-help{color:#687e75;font-size:.7rem;margin-top:-4px}
 
+/* Short home-page tool menu */
+.how-tools{margin-top:28px;display:grid;grid-template-columns:repeat(4,1fr);gap:12px;text-align:left}.how-tools a{min-height:105px;padding:17px;border:1px solid var(--line);border-radius:15px;background:#111b18;color:var(--text);text-decoration:none;display:grid;grid-template-columns:42px 1fr;grid-template-rows:auto auto;column-gap:11px;align-items:center}.how-tools a>span{grid-row:1/3;width:42px;height:42px;border-radius:12px;background:#1b2c26;display:grid;place-items:center;font-size:1.2rem}.how-tools b,.how-tools small{display:block}.how-tools b{font-size:.86rem}.how-tools small{color:var(--muted);font-size:.7rem}.how-tools a:hover{border-color:var(--lime);transform:translateY(-2px)}
+@media(max-width:980px){.how-tools{grid-template-columns:1fr 1fr}}
+@media(max-width:640px){.how-tools{grid-template-columns:1fr}.how-tools a{min-height:86px}}
+
 /* Language switch */
 .language-toggle{height:38px;padding:0 11px;border:1px solid rgba(255,255,255,.14);border-radius:10px;background:#101a17;color:#7f938b;display:flex;align-items:center;gap:7px;font:700 .68rem "Manrope",sans-serif;cursor:pointer;white-space:nowrap}.language-toggle i{width:1px;height:14px;background:#33433e}.language-toggle span{transition:.2s ease}.language-toggle span.active{color:var(--lime)}
 @media(max-width:980px){.navbar{gap:12px}.language-toggle{margin-left:auto}.menu-button{margin-left:0}}
