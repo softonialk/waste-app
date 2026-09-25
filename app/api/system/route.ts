@@ -5,6 +5,20 @@ export const dynamic = "force-dynamic";
 type ActionBody = Record<string, unknown> & { action?: string };
 const id = (prefix: string) => `${prefix}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 const text = (value: unknown) => typeof value === "string" ? value.trim() : "";
+const validName = (value: unknown) => {
+  const name = text(value);
+  return name.length >= 2 && name.length <= 60 && /^[\p{L}\p{M}.' -]+$/u.test(name) && /\p{L}/u.test(name);
+};
+const validPhone = (value: unknown) => /^(?:\+94|0)7\d{8}$/.test(text(value).replace(/[\s-]/g, ""));
+const normalizedPhone = (value: unknown) => text(value).replace(/[\s-]/g, "");
+const validPickupDate = (value: unknown) => {
+  const date = text(value);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const latest = new Date(today); latest.setDate(latest.getDate() + 30);
+  const selected = new Date(`${date}T00:00:00`);
+  return !Number.isNaN(selected.getTime()) && selected >= today && selected <= latest;
+};
 
 async function snapshot() {
   const db = getDatabase();
@@ -28,10 +42,18 @@ export async function POST(request: Request) {
     if (body.action === "createRequest") {
       const required = ["householdName", "phone", "address", "wasteType", "quantity", "pickupDate", "pickupTime"];
       if (required.some((key) => !text(body[key]))) return Response.json({ error: "Please complete every required field." }, { status: 400 });
-      await db.prepare(`INSERT INTO collection_requests (id, household_name, phone, address, waste_type, quantity, pickup_date, pickup_time, notes, status, coins_awarded, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 0, ?)`).bind(id("REQ"), text(body.householdName), text(body.phone), text(body.address), text(body.wasteType), text(body.quantity), text(body.pickupDate), text(body.pickupTime), text(body.notes), new Date().toISOString()).run();
+      if (!validName(body.householdName)) return Response.json({ error: "Enter a valid full name using letters only." }, { status: 400 });
+      if (!validPhone(body.phone)) return Response.json({ error: "Enter a valid Sri Lankan mobile number, for example 0771234567." }, { status: 400 });
+      const weight = Number(body.quantity);
+      if (!Number.isFinite(weight) || weight < 0.1 || weight > 1000) return Response.json({ error: "Estimated weight must be between 0.1 and 1000 kg." }, { status: 400 });
+      if (!validPickupDate(body.pickupDate)) return Response.json({ error: "Choose a pickup date from today up to 30 days ahead." }, { status: 400 });
+      if (text(body.address).length < 8 || text(body.address).length > 250) return Response.json({ error: "Enter a complete pickup address." }, { status: 400 });
+      await db.prepare(`INSERT INTO collection_requests (id, household_name, phone, address, waste_type, quantity, pickup_date, pickup_time, notes, status, coins_awarded, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 0, ?)`).bind(id("REQ"), text(body.householdName), normalizedPhone(body.phone), text(body.address), text(body.wasteType), `${weight} kg`, text(body.pickupDate), text(body.pickupTime), text(body.notes), new Date().toISOString()).run();
     } else if (body.action === "registerCollector") {
       if (!text(body.name) || !text(body.phone) || !text(body.serviceArea)) return Response.json({ error: "Name, phone and service area are required." }, { status: 400 });
-      await db.prepare(`INSERT INTO collectors (id, name, phone, service_area, organization, verification_status, created_at) VALUES (?, ?, ?, ?, ?, 'Verification Pending', ?)`).bind(id("CLR"), text(body.name), text(body.phone), text(body.serviceArea), text(body.organization) || "Independent Collector", new Date().toISOString()).run();
+      if (!validName(body.name)) return Response.json({ error: "Enter a valid collector name using letters only." }, { status: 400 });
+      if (!validPhone(body.phone)) return Response.json({ error: "Enter a valid Sri Lankan mobile number, for example 0771234567." }, { status: 400 });
+      await db.prepare(`INSERT INTO collectors (id, name, phone, service_area, organization, verification_status, created_at) VALUES (?, ?, ?, ?, ?, 'Verification Pending', ?)`).bind(id("CLR"), text(body.name), normalizedPhone(body.phone), text(body.serviceArea), text(body.organization) || "Independent Collector", new Date().toISOString()).run();
     } else if (body.action === "acceptRequest") {
       const collector = await db.prepare("SELECT * FROM collectors WHERE id = ? AND verification_status = 'Verified'").bind(text(body.collectorId)).first<Record<string, unknown>>();
       if (!collector) return Response.json({ error: "Only a verified collector can accept requests." }, { status: 403 });
