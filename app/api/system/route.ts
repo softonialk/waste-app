@@ -1,4 +1,5 @@
-import { getDatabase, type Database } from "../../../db/client";
+import { MongoServerError } from "mongodb";
+import { collections } from "../../../db/mongo";
 
 export const dynamic = "force-dynamic";
 
@@ -50,19 +51,24 @@ async function safeEqual(a: string, b: string) {
   return diff === 0;
 }
 
+
+type Collections = Awaited<ReturnType<typeof collections>>;
+const isDuplicateKey = (cause: unknown) => cause instanceof MongoServerError && cause.code === 11000;
+const COLLECTOR_FIELDS = { _id: 0, id: 1, name: 1, phone: 1, service_area: 1, organization: 1, verification_status: 1 } as const;
+
 async function isAdmin(request: Request) {
   const token = cookieValue(request, ADMIN_COOKIE);
   return Boolean(process.env.ADMIN_SESSION_TOKEN && token) && await safeEqual(token, process.env.ADMIN_SESSION_TOKEN!);
 }
 
-async function collectorFromKey(db: Database, where: string, value: string, key: string) {
-  const row = await db.prepare(`SELECT id, name, phone, service_area, organization, verification_status, access_key_hash FROM collectors WHERE ${where} = ? LIMIT 1`).bind(value).first<Collector & { access_key_hash: string | null }>();
+async function collectorFromKey(db: Collections, field: "id" | "phone", value: string, key: string): Promise<Collector | null> {
+  const row = await db.collectors.findOne({ [field]: value }, { projection: { ...COLLECTOR_FIELDS, access_key_hash: 1 } });
   if (!row?.access_key_hash || !/^[0-9a-f]{32}$/.test(key)) return null;
   if (!await safeEqual(await sha256(key), row.access_key_hash)) return null;
   return { id: row.id, name: row.name, phone: row.phone, service_area: row.service_area, organization: row.organization, verification_status: row.verification_status };
 }
 
-async function currentCollector(db: Database, request: Request) {
+async function currentCollector(db: Collections, request: Request) {
   const [collectorId, key] = cookieValue(request, COLLECTOR_COOKIE).split(".");
   if (!collectorId || !key) return null;
   return collectorFromKey(db, "id", collectorId, key);
@@ -78,15 +84,26 @@ async function rateLimitKey(parts: string[]) {
   return sha256(`${process.env.RATE_LIMIT_SALT}:${parts.join(":")}`);
 }
 
-async function consumeLimit(db: Database, request: Request, action: string, windowSeconds: number, ipMaximum: number, phone?: { value: string; maximum: number }) {
+async function countAttempt(db: Collections, key: string, action: string, expiresAt: Date) {
+  const update = { $inc: { attempts: 1 }, $setOnInsert: { action, expires_at: expiresAt } };
+  try {
+    return (await db.rateLimits.findOneAndUpdate({ key }, update, { upsert: true, returnDocument: "after" }))?.attempts ?? 1;
+  } catch (cause) {
+    // Two first attempts can race on the upsert; the loser retries against the now-existing document.
+    if (!isDuplicateKey(cause)) throw cause;
+    return (await db.rateLimits.findOneAndUpdate({ key }, update, { returnDocument: "after" }))?.attempts ?? 1;
+  }
+}
+
+async function consumeLimit(db: Collections, request: Request, action: string, windowSeconds: number, ipMaximum: number, phone?: { value: string; maximum: number }) {
   const now = Math.floor(Date.now() / 1000);
   const windowStart = Math.floor(now / windowSeconds) * windowSeconds;
+  const expiresAt = new Date((windowStart + windowSeconds) * 1000);
   const ip = request.headers.get("x-real-ip") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   const checks = [{ scope: "ip", value: ip, maximum: ipMaximum }, ...(phone ? [{ scope: "phone", ...phone }] : [])];
   for (const check of checks) {
     const key = await rateLimitKey([action, check.scope, check.value, String(windowStart)]);
-    const result = await db.prepare(`INSERT INTO submission_rate_limits (key, action, window_start, attempts) VALUES (?, ?, ?, 1) ON CONFLICT(key) DO UPDATE SET attempts = attempts + 1 RETURNING attempts`).bind(key, action, windowStart).first<{ attempts: number }>();
-    if ((result?.attempts ?? 1) > check.maximum) return Math.max(1, windowStart + windowSeconds - now);
+    if (await countAttempt(db, key, action, expiresAt) > check.maximum) return Math.max(1, windowStart + windowSeconds - now);
   }
   return 0;
 }
@@ -95,37 +112,46 @@ function rateLimited(retryAfter: number) {
   return Response.json({ error: "Too many attempts. Please wait and try again." }, { status: 429, headers: { "Retry-After": String(retryAfter) } });
 }
 
+async function coinsEarned(db: Collections, collectorId: string) {
+  const [row] = await db.requests.aggregate<{ total: number }>([
+    { $match: { collector_id: collectorId, status: "Completed" } },
+    { $group: { _id: null, total: { $sum: "$coins_awarded" } } },
+  ]).toArray();
+  return row?.total ?? 0;
+}
+
 // Each viewer only receives the records their session is entitled to.
 async function viewState(request: Request, overrides: { admin?: boolean; collector?: Collector | null; owner?: string | null } = {}) {
-  const db = getDatabase();
+  const db = await collections();
   const admin = overrides.admin ?? await isAdmin(request);
   const collector = overrides.collector !== undefined ? overrides.collector : await currentCollector(db, request);
   const owner = overrides.owner !== undefined ? overrides.owner : await householdOwner(request);
 
   const household = owner
-    ? (await db.prepare("SELECT id, household_name, address, waste_type, quantity, pickup_date, pickup_time, status, collector_name FROM collection_requests WHERE owner_hash = ? ORDER BY created_at DESC LIMIT 50").bind(owner).all()).results
+    ? await db.requests.find({ owner_hash: owner }, { projection: { _id: 0, id: 1, household_name: 1, address: 1, waste_type: 1, quantity: 1, pickup_date: 1, pickup_time: 1, status: 1, collector_name: 1 } }).sort({ created_at: -1 }).limit(50).toArray()
     : [];
 
   let collectorState: Row | null = null;
   if (collector) {
     const verified = collector.verification_status === "Verified";
-    const [openJobs, myJobs, redemptions, earned, spent] = await Promise.all([
-      verified ? db.prepare("SELECT id, address, waste_type, quantity, pickup_date, pickup_time, status FROM collection_requests WHERE status = 'Pending' ORDER BY pickup_date ASC LIMIT 100").all() : Promise.resolve({ results: [] }),
-      db.prepare("SELECT id, household_name, phone, address, waste_type, quantity, pickup_date, pickup_time, notes, status, recorded_weight, coins_awarded FROM collection_requests WHERE collector_id = ? ORDER BY created_at DESC").bind(collector.id).all(),
-      db.prepare("SELECT id, reward_name, points, reference, created_at FROM redemptions WHERE collector_id = ? ORDER BY created_at DESC").bind(collector.id).all(),
-      db.prepare("SELECT COALESCE(SUM(coins_awarded), 0) total FROM collection_requests WHERE collector_id = ? AND status = 'Completed'").bind(collector.id).first<{ total: number }>(),
-      db.prepare("SELECT COALESCE(SUM(points), 0) total FROM redemptions WHERE collector_id = ?").bind(collector.id).first<{ total: number }>(),
+    const [openJobs, myJobs, redemptions, earned, account] = await Promise.all([
+      verified ? db.requests.find({ status: "Pending" }, { projection: { _id: 0, id: 1, address: 1, waste_type: 1, quantity: 1, pickup_date: 1, pickup_time: 1, status: 1 } }).sort({ pickup_date: 1 }).limit(100).toArray() : Promise.resolve([]),
+      db.requests.find({ collector_id: collector.id }, { projection: { _id: 0, id: 1, household_name: 1, phone: 1, address: 1, waste_type: 1, quantity: 1, pickup_date: 1, pickup_time: 1, notes: 1, status: 1, recorded_weight: 1, coins_awarded: 1 } }).sort({ created_at: -1 }).toArray(),
+      db.redemptions.find({ collector_id: collector.id }, { projection: { _id: 0, id: 1, reward_name: 1, points: 1, reference: 1, created_at: 1 } }).sort({ created_at: -1 }).toArray(),
+      coinsEarned(db, collector.id),
+      db.collectors.findOne({ id: collector.id }, { projection: { _id: 0, coins_spent: 1 } }),
     ]);
-    collectorState = { profile: collector, openJobs: openJobs.results, jobs: myJobs.results, redemptions: redemptions.results, balance: (earned?.total ?? 0) - (spent?.total ?? 0) };
+    collectorState = { profile: collector, openJobs, jobs: myJobs, redemptions, balance: earned - (account?.coins_spent ?? 0) };
   }
 
   let adminState: Row | null = null;
   if (admin) {
-    const [requests, collectors] = await Promise.all([
-      db.prepare("SELECT id, household_name, phone, address, waste_type, quantity, pickup_date, pickup_time, notes, status, collector_id, collector_name, recorded_weight, coins_awarded, created_at FROM collection_requests ORDER BY created_at DESC").all(),
-      db.prepare("SELECT id, name, phone, service_area, organization, verification_status, access_key_hash IS NOT NULL AS has_access_key, created_at FROM collectors ORDER BY created_at DESC").all(),
+    const [requests, collectorRows] = await Promise.all([
+      db.requests.find({}, { projection: { _id: 0, owner_hash: 0 } }).sort({ created_at: -1 }).toArray(),
+      db.collectors.find({}, { projection: { ...COLLECTOR_FIELDS, access_key_hash: 1, created_at: 1 } }).sort({ created_at: -1 }).toArray(),
     ]);
-    adminState = { requests: requests.results, collectors: collectors.results };
+    const collectorList = collectorRows.map(({ access_key_hash, ...row }) => ({ ...row, has_access_key: access_key_hash ? 1 : 0 }));
+    adminState = { requests, collectors: collectorList };
   }
 
   return { adminAuthenticated: admin, household: { requests: household }, collector: collectorState, admin: adminState };
@@ -144,7 +170,7 @@ export async function POST(request: Request) {
     try { body = await request.json() as ActionBody; } catch { return error("Invalid request.", 400); }
     if (!body || typeof body !== "object") return error("Invalid request.", 400);
     if (text(body.website)) return error("Submission rejected.", 400);
-    const db = getDatabase();
+    const db = await collections();
 
     if (body.action === "adminLogin") {
       if (!process.env.ADMIN_PASSWORD || !process.env.ADMIN_SESSION_TOKEN) return error("Admin login is not configured.", 503);
@@ -187,7 +213,7 @@ export async function POST(request: Request) {
       const existing = cookieValue(request, HOUSEHOLD_COOKIE);
       const token = /^[0-9a-f]{32}$/.test(existing) ? existing : secret();
       const owner = await sha256(token);
-      await db.prepare(`INSERT INTO collection_requests (id, household_name, phone, address, waste_type, quantity, pickup_date, pickup_time, notes, status, coins_awarded, owner_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 0, ?, ?)`).bind(id("REQ"), text(body.householdName), normalizedPhone(body.phone), text(body.address), text(body.wasteType), `${weight} kg`, text(body.pickupDate), text(body.pickupTime), text(body.notes), owner, new Date().toISOString()).run();
+      await db.requests.insertOne({ id: id("REQ"), household_name: text(body.householdName), phone: normalizedPhone(body.phone), address: text(body.address), waste_type: text(body.wasteType), quantity: `${weight} kg`, pickup_date: text(body.pickupDate), pickup_time: text(body.pickupTime), notes: text(body.notes), status: "Pending", collector_id: null, collector_name: null, recorded_weight: null, coins_awarded: 0, owner_hash: owner, created_at: new Date().toISOString() });
       return Response.json(await viewState(request, { owner }), { headers: { "Set-Cookie": cookie(HOUSEHOLD_COOKIE, token, 60 * 60 * 24 * 365) } });
     }
 
@@ -199,11 +225,14 @@ export async function POST(request: Request) {
       if (text(body.organization).length > 100) return error("Organization name must be 100 characters or fewer.", 400);
       const retryAfter = await consumeLimit(db, request, "collector", 60 * 60 * 24, 3, { value: normalizedPhone(body.phone), maximum: 1 });
       if (retryAfter) return rateLimited(retryAfter);
-      const existing = await db.prepare("SELECT id FROM collectors WHERE phone = ? LIMIT 1").bind(normalizedPhone(body.phone)).first();
-      if (existing) return error("A collector is already registered with this phone number.", 409);
       const collectorId = id("CLR"); const accessKey = secret();
-      await db.prepare(`INSERT INTO collectors (id, name, phone, service_area, organization, verification_status, access_key_hash, created_at) VALUES (?, ?, ?, ?, ?, 'Verification Pending', ?, ?)`).bind(collectorId, text(body.name), normalizedPhone(body.phone), text(body.serviceArea), text(body.organization) || "Independent Collector", await sha256(accessKey), new Date().toISOString()).run();
       const collector = { id: collectorId, name: text(body.name), phone: normalizedPhone(body.phone), service_area: text(body.serviceArea), organization: text(body.organization) || "Independent Collector", verification_status: "Verification Pending" };
+      try {
+        await db.collectors.insertOne({ ...collector, access_key_hash: await sha256(accessKey), coins_spent: 0, created_at: new Date().toISOString() });
+      } catch (cause) {
+        if (isDuplicateKey(cause)) return error("A collector is already registered with this phone number.", 409);
+        throw cause;
+      }
       return Response.json({ ...(await viewState(request, { collector })), accessKey }, { headers: { "Set-Cookie": cookie(COLLECTOR_COOKIE, `${collectorId}.${accessKey}`, 60 * 60 * 24 * 30) } });
     }
 
@@ -213,25 +242,29 @@ export async function POST(request: Request) {
       if (collector.verification_status !== "Verified") return error("Only a verified collector can do this.", 403);
 
       if (body.action === "acceptRequest") {
-        const result = await db.prepare("UPDATE collection_requests SET status = 'Scheduled', collector_id = ?, collector_name = ? WHERE id = ? AND status = 'Pending'").bind(collector.id, collector.name, text(body.requestId)).run();
-        if (!result.meta.changes) return error("This pickup is no longer available.", 409);
+        const result = await db.requests.updateOne({ id: text(body.requestId), status: "Pending" }, { $set: { status: "Scheduled", collector_id: collector.id, collector_name: collector.name } });
+        if (!result.modifiedCount) return error("This pickup is no longer available.", 409);
       } else if (body.action === "completeRequest") {
         const weight = Number(body.weight);
         if (!validWeight(weight)) return error("Enter the verified collected weight between 0.1 and 1000 kg.", 400);
         if (!WASTE_TYPES.includes(text(body.wasteType))) return error("Select a valid waste type.", 400);
-        const result = await db.prepare("UPDATE collection_requests SET status = 'Completed', recorded_weight = ?, waste_type = ?, coins_awarded = ? WHERE id = ? AND collector_id = ? AND status = 'Scheduled'").bind(weight, text(body.wasteType), COINS_PER_PICKUP, text(body.requestId), collector.id).run();
-        if (!result.meta.changes) return error("This pickup is not scheduled for you.", 409);
+        const result = await db.requests.updateOne({ id: text(body.requestId), collector_id: collector.id, status: "Scheduled" }, { $set: { status: "Completed", recorded_weight: weight, waste_type: text(body.wasteType), coins_awarded: COINS_PER_PICKUP } });
+        if (!result.modifiedCount) return error("This pickup is not scheduled for you.", 409);
       } else {
         const rewardName = text(body.rewardName); const points = REWARDS[rewardName];
         if (!points) return error("Select a valid reward.", 400);
-        const reference = `ECO-${secret().slice(0, 8).toUpperCase()}`;
-        // Single statement so the balance check and the insert cannot race.
-        const result = await db.prepare(`INSERT INTO redemptions (id, collector_id, reward_name, points, reference, created_at)
-          SELECT ?, ?, ?, ?, ?, ?
-          WHERE (SELECT COALESCE(SUM(coins_awarded), 0) FROM collection_requests WHERE collector_id = ? AND status = 'Completed')
-              - (SELECT COALESCE(SUM(points), 0) FROM redemptions WHERE collector_id = ?) >= ?`)
-          .bind(id("RED"), collector.id, rewardName, points, reference, new Date().toISOString(), collector.id, collector.id, points).run();
-        if (!result.meta.changes) return error("Not enough collector coins for this reward.", 400);
+        const [earned, account] = await Promise.all([coinsEarned(db, collector.id), db.collectors.findOne({ id: collector.id }, { projection: { _id: 0, coins_spent: 1 } })]);
+        const spent = account?.coins_spent ?? 0;
+        if (earned - spent < points) return error("Not enough collector coins for this reward.", 400);
+        // Earned coins only grow, so reserving against the spent total we read cannot overdraw; a concurrent redemption changes it and fails this match.
+        const reserved = await db.collectors.updateOne({ id: collector.id, coins_spent: spent }, { $inc: { coins_spent: points } });
+        if (!reserved.modifiedCount) return error("Your balance changed. Please try again.", 409);
+        try {
+          await db.redemptions.insertOne({ id: id("RED"), collector_id: collector.id, reward_name: rewardName, points, reference: `ECO-${secret().slice(0, 8).toUpperCase()}`, created_at: new Date().toISOString() });
+        } catch (cause) {
+          await db.collectors.updateOne({ id: collector.id }, { $inc: { coins_spent: -points } });
+          throw cause;
+        }
       }
       return Response.json(await viewState(request, { collector }));
     }
@@ -239,13 +272,13 @@ export async function POST(request: Request) {
     if (["rejectRequest", "verifyCollector", "issueCollectorKey"].includes(body.action ?? "")) {
       if (!await isAdmin(request)) return error("Admin login required.", 401);
       if (body.action === "rejectRequest") {
-        await db.prepare("UPDATE collection_requests SET status = 'Cancelled' WHERE id = ? AND status = 'Pending'").bind(text(body.requestId)).run();
+        await db.requests.updateOne({ id: text(body.requestId), status: "Pending" }, { $set: { status: "Cancelled" } });
       } else if (body.action === "verifyCollector") {
-        await db.prepare("UPDATE collectors SET verification_status = 'Verified' WHERE id = ?").bind(text(body.collectorId)).run();
+        await db.collectors.updateOne({ id: text(body.collectorId) }, { $set: { verification_status: "Verified" } });
       } else {
         const accessKey = secret();
-        const result = await db.prepare("UPDATE collectors SET access_key_hash = ? WHERE id = ?").bind(await sha256(accessKey), text(body.collectorId)).run();
-        if (!result.meta.changes) return error("Collector not found.", 404);
+        const result = await db.collectors.updateOne({ id: text(body.collectorId) }, { $set: { access_key_hash: await sha256(accessKey) } });
+        if (!result.matchedCount) return error("Collector not found.", 404);
         return Response.json({ ...(await viewState(request, { admin: true })), accessKey });
       }
       return Response.json(await viewState(request, { admin: true }));
