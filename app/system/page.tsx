@@ -14,8 +14,9 @@ export default function SystemPage() {
   const [role,setRole] = useState<Role>(()=>{ if(typeof window==="undefined") return "household"; const value=new URLSearchParams(window.location.search).get("role"); return value&&["household","collector","admin"].includes(value)?value as Role:"household"; });
   const [data,setData] = useState<Data>({requests:[],collectors:[],redemptions:[]});
   const [collectorId,setCollectorId] = useState("");
+  const [loading,setLoading] = useState(true);
   const [busy,setBusy] = useState(false); const [message,setMessage] = useState(""); const [error,setError] = useState("");
-  useEffect(()=>{ let active=true; fetch("/api/system",{cache:"no-store"}).then(async response=>{const json=await response.json();if(!response.ok) throw new Error(json.error);return json;}).then(json=>{if(!active)return;setData(json);setCollectorId(json.collectors?.[0]?.id||"");}).catch(e=>{if(active)setError(e instanceof Error?e.message:"Unable to load the system.");});return()=>{active=false;}; },[]);
+  useEffect(()=>{ let active=true; fetch("/api/system",{cache:"no-store"}).then(async response=>{const json=await response.json();if(!response.ok) throw new Error(json.error);return json;}).then(json=>{if(!active)return;setData(json);setCollectorId(json.collectors?.[0]?.id||"");}).catch(e=>{if(active)setError(e instanceof Error?e.message:"Unable to load the system.");}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;}; },[]);
   async function act(payload:Record<string,unknown>, success:string){ setBusy(true);setError("");setMessage(""); try{ const response=await fetch("/api/system",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); const json=await response.json(); if(!response.ok) throw new Error(json.error); setData(json); setCollectorId((current)=>current || json.collectors?.[0]?.id || ""); setMessage(success); }catch(e){setError(e instanceof Error?e.message:"Action failed.");}finally{setBusy(false);} }
   const collector=data.collectors.find(c=>c.id===collectorId); const assigned=data.requests.filter(r=>r.collector_id===collectorId);
   const balance=useMemo(()=>assigned.filter(r=>r.status==="Completed").reduce((n,r)=>n+Number(r.coins_awarded||0),0)-data.redemptions.filter(r=>r.collector_id===collectorId).reduce((n,r)=>n+Number(r.points),0),[assigned,data.redemptions,collectorId]);
@@ -26,9 +27,10 @@ export default function SystemPage() {
     <nav className="role-tabs" aria-label="Select demo role">{(["household","collector","admin"] as Role[]).map(r=><button key={r} className={role===r?"active":""} onClick={()=>{setRole(r);setMessage("");setError("");}}>{r==="household"?"🏠 Household":r==="collector"?"🚛 Collector":"🛡️ Admin"}</button>)}</nav>
     <div className="demo-banner">Demo role switch: use all three views to test the complete workflow. Real sign-in can be connected later.</div>
     {(message||error)&&<div className={error?"system-alert error":"system-alert"}>{error||message}</div>}
-    {role==="household"&&<Household data={data} busy={busy} act={act}/>} 
-    {role==="collector"&&<CollectorView data={data} collector={collector} collectorId={collectorId} setCollectorId={setCollectorId} balance={balance} busy={busy} act={act}/>} 
-    {role==="admin"&&<Admin data={data} busy={busy} act={act}/>} 
+    {loading&&<div className="system-alert" role="status" aria-live="polite">Loading system data...</div>}
+    {!loading&&role==="household"&&<Household data={data} busy={busy} act={act}/>} 
+    {!loading&&role==="collector"&&<CollectorView data={data} collector={collector} collectorId={collectorId} setCollectorId={setCollectorId} balance={balance} busy={busy} act={act}/>} 
+    {!loading&&role==="admin"&&<Admin data={data} busy={busy} act={act}/>} 
   </main>;
 }
 
