@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, MouseEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import WasteScanner, { preloadWasteModel } from "./components/waste-scanner";
 
@@ -152,6 +152,14 @@ export default function Home() {
     setFilters((current) => current.includes(filter) ? current.filter((item) => item !== filter) : [...current, filter]);
   }
 
+  function goHome(event: MouseEvent<HTMLAnchorElement>) {
+    if (window.location.pathname !== "/") return;
+    event.preventDefault();
+    window.history.replaceState(null, "", "/");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    setMenuOpen(false);
+  }
+
   async function submitSearch(event: FormEvent) {
     event.preventDefault();
     const query = location.trim();
@@ -189,10 +197,10 @@ export default function Home() {
   return (
     <main>
       <header className="navbar">
-        <a className="logo" href="#home"><span className="logo-mark">↻</span><span><b>EcoLoop</b><small>{t("Smart Waste Management", "බුද්ධිමත් කසළ කළමනාකරණය")}</small></span></a>
+        <Link className="logo" href="/" onClick={goHome}><span className="logo-mark">↻</span><span><b>EcoLoop</b><small>{t("Smart Waste Management", "බුද්ධිමත් කසළ කළමනාකරණය")}</small></span></Link>
         <button className="menu-button" aria-label="Toggle menu" onClick={() => setMenuOpen(!menuOpen)}>☰</button>
         <nav className={menuOpen ? "nav-links open" : "nav-links"}>
-          <a href="#home">{t("Home", "මුල් පිටුව")}</a><a href="#how">{t("How It Works", "ක්‍රියා කරන ආකාරය")}</a><Link href="/dashboard">{t("Dashboard", "ඩෑෂ්බෝඩ්")}</Link>
+          <Link href="/" onClick={goHome}>{t("Home", "මුල් පිටුව")}</Link><a href="#how">{t("How It Works", "ක්‍රියා කරන ආකාරය")}</a><Link href="/dashboard">{t("Dashboard", "ඩෑෂ්බෝඩ්")}</Link>
         </nav>
         <button className="language-toggle" onClick={() => setLanguage(isSi ? "en" : "si")} aria-label={t("Switch to Sinhala", "ඉංග්‍රීසි භාෂාවට මාරු වන්න")}><span className={!isSi ? "active" : ""}>EN</span><i></i><span className={isSi ? "active" : ""}>සිං</span></button>
         <div className="nav-actions"><Link className="dashboard-link" href="/system?role=collector">🚛 {t("Collector", "එකතු කරන්නා")}</Link><Link className="button button-small" href="/system?role=household"><span>♻</span> {t("Request Pickup", "එකතු කිරීමක් ඉල්ලන්න")}</Link></div>
@@ -266,7 +274,7 @@ export default function Home() {
 
       <section className="section final-cta final-action" id="get-started" hidden></section>
 
-      <footer className="footer simple-footer" id="footer"><div className="footer-grid"><div className="footer-brand"><a className="logo" href="#home"><span className="logo-mark">↻</span><span><b>EcoLoop</b><small>{t("Smart Waste Management", "බුද්ධිමත් කසළ කළමනාකරණය")}</small></span></a><p>{t("Making recycling easier for Sri Lankan communities.", "ශ්‍රී ලාංකික ප්‍රජාවන්ට ප්‍රතිචක්‍රීකරණය පහසු කරමු.")}</p></div><div className="footer-links"><h4>{t("Quick Links", "ඉක්මන් සබැඳි")}</h4><a href="#home">{t("Home", "මුල් පිටුව")}</a><a href="#how">{t("How It Works", "ක්‍රියා කරන ආකාරය")}</a><Link href="/dashboard">{t("Dashboard", "ඩෑෂ්බෝඩ්")}</Link><Link href="/system?role=household">{t("Request Pickup", "එකතු කිරීමක් ඉල්ලන්න")}</Link><Link href="/system?role=collector">{t("Collector Portal", "එකතු කරන්නාගේ පිටුව")}</Link></div><div className="footer-contact"><h4>{t("Contact", "සම්බන්ධතා")}</h4><a href="mailto:hello@ecoloop.lk">✉ hello@ecoloop.lk</a><span>☎ {t("Phone support coming soon", "දුරකථන සහාය ළඟදීම")}</span><span>📍 {t("Sri Lanka", "ශ්‍රී ලංකාව")}</span></div><div className="footer-social"><h4>{t("Follow Us", "අපව අනුගමනය කරන්න")}</h4><button type="button" aria-label="Facebook"><span>f</span> Facebook</button><button type="button" aria-label="Instagram"><span>◎</span> Instagram</button><button type="button" aria-label="TikTok"><span>♪</span> TikTok</button><small>{t("Social channels coming soon", "සමාජ මාධ්‍ය සබැඳි ළඟදීම")}</small></div></div><div className="footer-bottom"><span>© 2026 EcoLoop. {t("All rights reserved.", "සියලු හිමිකම් ඇවිරිණි.")}</span><span>{t("Built for a cleaner Sri Lanka", "පිරිසිදු ශ්‍රී ලංකාවක් වෙනුවෙන්")} 🇱🇰</span></div></footer>
+      <footer className="footer simple-footer" id="footer"><div className="footer-grid"><div className="footer-brand"><Link className="logo" href="/" onClick={goHome}><span className="logo-mark">↻</span><span><b>EcoLoop</b><small>{t("Smart Waste Management", "බුද්ධිමත් කසළ කළමනාකරණය")}</small></span></Link><p>{t("Making recycling easier for Sri Lankan communities.", "ශ්‍රී ලාංකික ප්‍රජාවන්ට ප්‍රතිචක්‍රීකරණය පහසු කරමු.")}</p></div><div className="footer-links"><h4>{t("Quick Links", "ඉක්මන් සබැඳි")}</h4><Link href="/" onClick={goHome}>{t("Home", "මුල් පිටුව")}</Link><a href="#how">{t("How It Works", "ක්‍රියා කරන ආකාරය")}</a><Link href="/dashboard">{t("Dashboard", "ඩෑෂ්බෝඩ්")}</Link><Link href="/system?role=household">{t("Request Pickup", "එකතු කිරීමක් ඉල්ලන්න")}</Link><Link href="/system?role=collector">{t("Collector Portal", "එකතු කරන්නාගේ පිටුව")}</Link></div><div className="footer-contact"><h4>{t("Contact", "සම්බන්ධතා")}</h4><a href="mailto:hello@ecoloop.lk">✉ hello@ecoloop.lk</a><span>☎ {t("Phone support coming soon", "දුරකථන සහාය ළඟදීම")}</span><span>📍 {t("Sri Lanka", "ශ්‍රී ලංකාව")}</span></div><div className="footer-social"><h4>{t("Follow Us", "අපව අනුගමනය කරන්න")}</h4><button type="button" aria-label="Facebook"><span>f</span> Facebook</button><button type="button" aria-label="Instagram"><span>◎</span> Instagram</button><button type="button" aria-label="TikTok"><span>♪</span> TikTok</button><small>{t("Social channels coming soon", "සමාජ මාධ්‍ය සබැඳි ළඟදීම")}</small></div></div><div className="footer-bottom"><span>© 2026 EcoLoop. {t("All rights reserved.", "සියලු හිමිකම් ඇවිරිණි.")}</span><span>{t("Built for a cleaner Sri Lanka", "පිරිසිදු ශ්‍රී ලංකාවක් වෙනුවෙන්")} 🇱🇰</span></div></footer>
     </main>
   );
 }
