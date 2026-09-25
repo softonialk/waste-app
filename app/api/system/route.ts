@@ -1,5 +1,4 @@
-import { env } from "cloudflare:workers";
-import { getDatabase } from "../../../db/raw";
+import { getDatabase, type Database } from "../../../db/client";
 
 export const dynamic = "force-dynamic";
 
@@ -53,17 +52,17 @@ async function safeEqual(a: string, b: string) {
 
 async function isAdmin(request: Request) {
   const token = cookieValue(request, ADMIN_COOKIE);
-  return Boolean(env.ADMIN_SESSION_TOKEN && token) && await safeEqual(token, env.ADMIN_SESSION_TOKEN!);
+  return Boolean(process.env.ADMIN_SESSION_TOKEN && token) && await safeEqual(token, process.env.ADMIN_SESSION_TOKEN!);
 }
 
-async function collectorFromKey(db: D1Database, where: string, value: string, key: string) {
+async function collectorFromKey(db: Database, where: string, value: string, key: string) {
   const row = await db.prepare(`SELECT id, name, phone, service_area, organization, verification_status, access_key_hash FROM collectors WHERE ${where} = ? LIMIT 1`).bind(value).first<Collector & { access_key_hash: string | null }>();
   if (!row?.access_key_hash || !/^[0-9a-f]{32}$/.test(key)) return null;
   if (!await safeEqual(await sha256(key), row.access_key_hash)) return null;
   return { id: row.id, name: row.name, phone: row.phone, service_area: row.service_area, organization: row.organization, verification_status: row.verification_status };
 }
 
-async function currentCollector(db: D1Database, request: Request) {
+async function currentCollector(db: Database, request: Request) {
   const [collectorId, key] = cookieValue(request, COLLECTOR_COOKIE).split(".");
   if (!collectorId || !key) return null;
   return collectorFromKey(db, "id", collectorId, key);
@@ -75,14 +74,14 @@ async function householdOwner(request: Request) {
 }
 
 async function rateLimitKey(parts: string[]) {
-  if (!env.RATE_LIMIT_SALT) throw new Error("Rate limiting is not configured.");
-  return sha256(`${env.RATE_LIMIT_SALT}:${parts.join(":")}`);
+  if (!process.env.RATE_LIMIT_SALT) throw new Error("Rate limiting is not configured.");
+  return sha256(`${process.env.RATE_LIMIT_SALT}:${parts.join(":")}`);
 }
 
-async function consumeLimit(db: D1Database, request: Request, action: string, windowSeconds: number, ipMaximum: number, phone?: { value: string; maximum: number }) {
+async function consumeLimit(db: Database, request: Request, action: string, windowSeconds: number, ipMaximum: number, phone?: { value: string; maximum: number }) {
   const now = Math.floor(Date.now() / 1000);
   const windowStart = Math.floor(now / windowSeconds) * windowSeconds;
-  const ip = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = request.headers.get("x-real-ip") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   const checks = [{ scope: "ip", value: ip, maximum: ipMaximum }, ...(phone ? [{ scope: "phone", ...phone }] : [])];
   for (const check of checks) {
     const key = await rateLimitKey([action, check.scope, check.value, String(windowStart)]);
@@ -148,11 +147,11 @@ export async function POST(request: Request) {
     const db = getDatabase();
 
     if (body.action === "adminLogin") {
-      if (!env.ADMIN_PASSWORD || !env.ADMIN_SESSION_TOKEN) return error("Admin login is not configured.", 503);
+      if (!process.env.ADMIN_PASSWORD || !process.env.ADMIN_SESSION_TOKEN) return error("Admin login is not configured.", 503);
       const retryAfter = await consumeLimit(db, request, "admin-login", 15 * 60, 10);
       if (retryAfter) return rateLimited(retryAfter);
-      if (!await safeEqual(text(body.password), env.ADMIN_PASSWORD)) return error("Incorrect admin password.", 401);
-      return Response.json(await viewState(request, { admin: true }), { headers: { "Set-Cookie": cookie(ADMIN_COOKIE, env.ADMIN_SESSION_TOKEN, 60 * 60 * 8) } });
+      if (!await safeEqual(text(body.password), process.env.ADMIN_PASSWORD)) return error("Incorrect admin password.", 401);
+      return Response.json(await viewState(request, { admin: true }), { headers: { "Set-Cookie": cookie(ADMIN_COOKIE, process.env.ADMIN_SESSION_TOKEN, 60 * 60 * 8) } });
     }
     if (body.action === "adminLogout") {
       return Response.json(await viewState(request, { admin: false }), { headers: { "Set-Cookie": cookie(ADMIN_COOKIE, "", 0) } });
