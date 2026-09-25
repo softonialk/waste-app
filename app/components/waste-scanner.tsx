@@ -28,6 +28,23 @@ function loadScript(id: string, source: string) {
   });
 }
 
+let modelPromise: Promise<CocoModel> | null = null;
+
+export function preloadWasteModel() {
+  if (modelPromise) return modelPromise;
+  modelPromise = (async () => {
+    await loadScript("tensorflow-js", "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js");
+    await loadScript("coco-ssd", "https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js");
+    if (!window.tf || !window.cocoSsd) throw new Error("AI model is unavailable.");
+    await window.tf.ready();
+    return window.cocoSsd.load({ base: "lite_mobilenet_v2" });
+  })().catch((error) => {
+    modelPromise = null;
+    throw error;
+  });
+  return modelPromise;
+}
+
 const categoryByObject: Record<string, Omit<ScanResult, "object" | "confidence">> = {
   banana: { category: "Organic Waste", categorySi: "කාබනික කසළ" }, apple: { category: "Organic Waste", categorySi: "කාබනික කසළ" }, orange: { category: "Organic Waste", categorySi: "කාබනික කසළ" }, broccoli: { category: "Organic Waste", categorySi: "කාබනික කසළ" }, carrot: { category: "Organic Waste", categorySi: "කාබනික කසළ" }, sandwich: { category: "Organic Waste", categorySi: "කාබනික කසළ" }, pizza: { category: "Organic Waste", categorySi: "කාබනික කසළ" }, donut: { category: "Organic Waste", categorySi: "කාබනික කසළ" }, cake: { category: "Organic Waste", categorySi: "කාබනික කසළ" },
   "cell phone": { category: "E-Waste", categorySi: "ඉලෙක්ට්‍රොනික කසළ" }, laptop: { category: "E-Waste", categorySi: "ඉලෙක්ට්‍රොනික කසළ" }, keyboard: { category: "E-Waste", categorySi: "ඉලෙක්ට්‍රොනික කසළ" }, mouse: { category: "E-Waste", categorySi: "ඉලෙක්ට්‍රොනික කසළ" }, remote: { category: "E-Waste", categorySi: "ඉලෙක්ට්‍රොනික කසළ" }, tv: { category: "E-Waste", categorySi: "ඉලෙක්ට්‍රොනික කසළ" }, toaster: { category: "E-Waste", categorySi: "ඉලෙක්ට්‍රොනික කසළ" }, microwave: { category: "E-Waste", categorySi: "ඉලෙක්ට්‍රොනික කසළ" }, oven: { category: "E-Waste", categorySi: "ඉලෙක්ට්‍රොනික කසළ" }, refrigerator: { category: "E-Waste", categorySi: "ඉලෙක්ට්‍රොනික කසළ" },
@@ -54,34 +71,34 @@ export default function WasteScanner({ language, onClose }: Props) {
     streamRef.current = null;
   }
 
-  useEffect(() => stopScanner, []);
+  useEffect(() => {
+    void preloadWasteModel().catch(() => undefined);
+    return stopScanner;
+  }, []);
 
   async function startScanner() {
     setStatus("loading");
     setMessage(t("Opening camera and loading the free AI model...", "Camera එක අරිමින් free AI model එක load කරමින්..."));
     setResult(null);
     try {
+      const pendingModel = preloadWasteModel();
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
       streamRef.current = stream;
       if (!videoRef.current) throw new Error("Camera preview is unavailable.");
       videoRef.current.srcObject = stream;
       await videoRef.current.play();
-      await loadScript("tensorflow-js", "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js");
-      await loadScript("coco-ssd", "https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js");
-      if (!window.tf || !window.cocoSsd) throw new Error("AI model is unavailable.");
-      await window.tf.ready();
-      const model = await window.cocoSsd.load({ base: "lite_mobilenet_v2" });
+      const model = await pendingModel;
       setStatus("scanning");
       setMessage(t("Hold one item inside the box. Scanning automatically...", "එක භාණ්ඩයක් කොටුව ඇතුළේ අල්ලන්න. Automatically scan වෙමින්..."));
       timerRef.current = setInterval(async () => {
         if (busyRef.current || !videoRef.current || videoRef.current.readyState < 2) return;
         busyRef.current = true;
         try {
-          const predictions = await model.detect(videoRef.current, 8, 0.42);
+          const predictions = await model.detect(videoRef.current, 6, 0.35);
           const match = predictions.filter((prediction) => categoryByObject[prediction.class]).sort((a, b) => b.score - a.score)[0];
           if (match) setResult({ object: match.class, confidence: Math.round(match.score * 100), ...categoryByObject[match.class] });
         } finally { busyRef.current = false; }
-      }, 900);
+      }, 450);
     } catch (error) {
       stopScanner();
       setStatus("error");
