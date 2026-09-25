@@ -36,3 +36,10 @@ export const redemptions = sqliteTable("redemptions", {
   reference: text("reference").notNull(),
   createdAt: text("created_at").notNull(),
 });
+
+export const submissionRateLimits = sqliteTable("submission_rate_limits", {
+  key: text("key").primaryKey(),
+  action: text("action").notNull(),
+  windowStart: integer("window_start").notNull(),
+  attempts: integer("attempts").notNull().default(1),
+});

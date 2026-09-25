@@ -25,6 +25,33 @@ const validPickupDate = (value: unknown) => {
   return !Number.isNaN(selected.getTime()) && selected >= today && selected <= latest;
 };
 
+async function rateLimitKey(parts: string[]) {
+  if (!env.RATE_LIMIT_SALT) throw new Error("Rate limiting is not configured.");
+  const bytes = new TextEncoder().encode(`${env.RATE_LIMIT_SALT}:${parts.join(":")}`);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function consumeLimit(db: D1Database, request: Request, action: string, phone: string, windowSeconds: number, ipMaximum: number, phoneMaximum: number) {
+  const now = Math.floor(Date.now() / 1000);
+  const windowStart = Math.floor(now / windowSeconds) * windowSeconds;
+  const ip = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const checks = [
+    { scope: "ip", value: ip, maximum: ipMaximum },
+    { scope: "phone", value: phone, maximum: phoneMaximum },
+  ];
+  for (const check of checks) {
+    const key = await rateLimitKey([action, check.scope, check.value, String(windowStart)]);
+    const result = await db.prepare(`INSERT INTO submission_rate_limits (key, action, window_start, attempts) VALUES (?, ?, ?, 1) ON CONFLICT(key) DO UPDATE SET attempts = attempts + 1 RETURNING attempts`).bind(key, action, windowStart).first<{ attempts: number }>();
+    if ((result?.attempts ?? 1) > check.maximum) return Math.max(1, windowStart + windowSeconds - now);
+  }
+  return 0;
+}
+
+function rateLimited(retryAfter: number) {
+  return Response.json({ error: "Too many submissions. Please wait and try again." }, { status: 429, headers: { "Retry-After": String(retryAfter) } });
+}
+
 async function snapshot() {
   const db = getDatabase();
   const [requests, collectors, redemptions] = await Promise.all([
@@ -46,7 +73,10 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const contentLength = Number(request.headers.get("content-length") || 0);
+    if (contentLength > 10_000) return Response.json({ error: "Request is too large." }, { status: 413 });
     const body = await request.json() as ActionBody;
+    if (text(body.website)) return Response.json({ error: "Submission rejected." }, { status: 400 });
     if (body.action === "adminLogin") {
       if (!env.ADMIN_PASSWORD || !env.ADMIN_SESSION_TOKEN) return Response.json({ error: "Admin login is not configured." }, { status: 503 });
       if (text(body.password) !== env.ADMIN_PASSWORD) return Response.json({ error: "Incorrect admin password." }, { status: 401 });
@@ -65,11 +95,17 @@ export async function POST(request: Request) {
       if (!Number.isFinite(weight) || weight < 0.1 || weight > 1000) return Response.json({ error: "Estimated weight must be between 0.1 and 1000 kg." }, { status: 400 });
       if (!validPickupDate(body.pickupDate)) return Response.json({ error: "Choose a pickup date from today up to 30 days ahead." }, { status: 400 });
       if (text(body.address).length < 8 || text(body.address).length > 250) return Response.json({ error: "Enter a complete pickup address." }, { status: 400 });
+      const retryAfter = await consumeLimit(db, request, "pickup", normalizedPhone(body.phone), 60 * 60, 5, 2);
+      if (retryAfter) return rateLimited(retryAfter);
       await db.prepare(`INSERT INTO collection_requests (id, household_name, phone, address, waste_type, quantity, pickup_date, pickup_time, notes, status, coins_awarded, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 0, ?)`).bind(id("REQ"), text(body.householdName), normalizedPhone(body.phone), text(body.address), text(body.wasteType), `${weight} kg`, text(body.pickupDate), text(body.pickupTime), text(body.notes), new Date().toISOString()).run();
     } else if (body.action === "registerCollector") {
       if (!text(body.name) || !text(body.phone) || !text(body.serviceArea)) return Response.json({ error: "Name, phone and service area are required." }, { status: 400 });
       if (!validName(body.name)) return Response.json({ error: "Enter a valid collector name using letters only." }, { status: 400 });
       if (!validPhone(body.phone)) return Response.json({ error: "Enter a valid Sri Lankan mobile number, for example 0771234567." }, { status: 400 });
+      const existing = await db.prepare("SELECT id FROM collectors WHERE phone = ? LIMIT 1").bind(normalizedPhone(body.phone)).first();
+      if (existing) return Response.json({ error: "A collector is already registered with this phone number." }, { status: 409 });
+      const retryAfter = await consumeLimit(db, request, "collector", normalizedPhone(body.phone), 60 * 60 * 24, 3, 1);
+      if (retryAfter) return rateLimited(retryAfter);
       await db.prepare(`INSERT INTO collectors (id, name, phone, service_area, organization, verification_status, created_at) VALUES (?, ?, ?, ?, ?, 'Verification Pending', ?)`).bind(id("CLR"), text(body.name), normalizedPhone(body.phone), text(body.serviceArea), text(body.organization) || "Independent Collector", new Date().toISOString()).run();
     } else if (body.action === "acceptRequest") {
       const collector = await db.prepare("SELECT * FROM collectors WHERE id = ? AND verification_status = 'Verified'").bind(text(body.collectorId)).first<Record<string, unknown>>();
