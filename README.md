@@ -1,43 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# EcoLoop — Smart Waste Management
 
-## Getting Started
+Households request free pickups of sorted recyclable waste, verified collectors
+complete them and earn coins, and admins verify collectors.
 
-First, run the development server:
+Built with Next.js (App Router) and MongoDB. Deployed on Vercel at
+https://www.nextgen.mom.
+
+## Local development
 
 ```bash
+npm install
+cp .env.example .env.local   # fill in MONGODB_URI and the secrets
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Collections and indexes are created automatically on first connection.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Name | Purpose |
+|---|---|
+| `MONGODB_URI` | MongoDB connection string, e.g. from MongoDB Atlas |
+| `MONGODB_DB` | Database name (optional, defaults to `ecoloop`) |
+| `ADMIN_PASSWORD` | Admin portal password |
+| `ADMIN_SESSION_TOKEN` | Long random string (`openssl rand -hex 32`) |
+| `RATE_LIMIT_SALT` | Long random string (`openssl rand -hex 32`) |
 
-## Learn More
+## Deploy on Vercel
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Cloudflare
-
-This app uses Cloudflare Workers and D1. Authenticate once, apply database
-migrations, and deploy:
-
-```bash
-npx wrangler login
-npm run db:migrate:remote
-npm run deploy
-```
-
-Production: https://ecoloop.ecoloop-softonia.workers.dev
+1. Create a MongoDB Atlas cluster, or add MongoDB Atlas from the Vercel
+   Marketplace, which sets `MONGODB_URI` for you. In Atlas **Network Access**,
+   allow `0.0.0.0/0`, since Vercel functions do not use fixed IP addresses.
+2. Import the repository in Vercel (framework preset: Next.js) and add the
+   environment variables above for Production.
+3. In **Project → Settings → Domains**, add `www.nextgen.mom` and `nextgen.mom`
+   (redirect `nextgen.mom` to `www.nextgen.mom`), then add the DNS records
+   Vercel shows at your domain registrar.

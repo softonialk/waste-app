@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,12 +40,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-# Sites local helpers
-.sites-runtime/
-.wrangler/
-dist/
-.vinext/
-
-# wrangler local secrets
-.dev.vars*

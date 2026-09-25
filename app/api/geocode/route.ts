@@ -18,7 +18,7 @@ export async function GET(request: Request) {
       headers: {
         Accept: "application/json",
         "Accept-Language": "en",
-        "User-Agent": "EcoLoop-Waste-App/1.0 (hello@ecoloop.lk)",
+        "User-Agent": "EcoLoop-Waste-App/1.0 (+https://www.nextgen.mom)",
       },
       cache: "no-store",
     });
