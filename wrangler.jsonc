@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "ecoloop",
+  "workers_dev": true,
+  "preview_urls": true,
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "vinext/server/fetch-handler",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ecoloop-production",
+      "database_id": "37b53981-8916-4203-b34b-772e6fc2a202",
+      "migrations_dir": "drizzle"
+    }
+  ]
+}
