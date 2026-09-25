@@ -1,5 +1,3 @@
-"use client";
-
 import LegalPage, { type LegalSection } from "../components/legal-page";
 
 const sections: LegalSection[] = [
@@ -42,8 +40,8 @@ const sections: LegalSection[] = [
   {
     title: "The service",
     titleSi: "සේවාව",
-    body: <p>EcoLoop connects households and independent collectors and does not guarantee that every request will be collected. District hub locations are planned locations until each hub opens. We may update these terms; the date above shows the latest version.</p>,
-    bodySi: <p>EcoLoop නිවාස සහ ස්වාධීන එකතු කරන්නන් සම්බන්ධ කරන අතර සෑම ඉල්ලීමක්ම එකතු කරන බවට සහතික නොවේ. එක් එක් hub එක විවෘත වන තුරු දිස්ත්‍රික් hub ස්ථාන සැලසුම් කළ ස්ථාන වේ. මෙම කොන්දේසි යාවත්කාලීන විය හැක; ඉහත දිනය නවතම අනුවාදය පෙන්වයි.</p>,
+    body: <p>NextGen connects households and independent collectors and does not guarantee that every request will be collected. District hub locations are planned locations until each hub opens. We may update these terms; the date above shows the latest version.</p>,
+    bodySi: <p>NextGen නිවාස සහ ස්වාධීන එකතු කරන්නන් සම්බන්ධ කරන අතර සෑම ඉල්ලීමක්ම එකතු කරන බවට සහතික නොවේ. එක් එක් hub එක විවෘත වන තුරු දිස්ත්‍රික් hub ස්ථාන සැලසුම් කළ ස්ථාන වේ. මෙම කොන්දේසි යාවත්කාලීන විය හැක; ඉහත දිනය නවතම අනුවාදය පෙන්වයි.</p>,
   },
 ];
 

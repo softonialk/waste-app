@@ -2,26 +2,34 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { FormEvent, MouseEvent, useEffect, useState } from "react";
-import { DISTRICTS } from "../lib/constants";
-import { LanguageToggle, useLanguage } from "./components/language";
+import { FormEvent, useEffect, useState } from "react";
+import { COINS_PER_PICKUP, DISTRICTS, REWARDS } from "../lib/constants";
+import { Bi, bi } from "./components/bi";
 import SiteFooter from "./components/site-footer";
+import SiteHeader from "./components/site-header";
 import WasteScanner, { preloadWasteModel } from "./components/waste-scanner";
 
-const steps = [
-  { n: "01", icon: "♻️", title: "Sort Your Waste", titleSi: "කසළ වෙන් කරන්න", text: "Separate your recyclable waste into the correct categories.", textSi: "ප්‍රතිචක්‍රීකරණය කළ හැකි කසළ නිවැරදි කාණ්ඩවලට වෙන් කරන්න." },
-  { n: "02", icon: "📅", title: "Request a Pickup", titleSi: "එකතු කිරීමක් ඉල්ලන්න", text: "Choose your district, a date and a time. It is free.", textSi: "ඔබේ දිස්ත්‍රික්කය, දිනය සහ වේලාව තෝරන්න. එය නොමිලේ." },
-  { n: "03", icon: "🚛", title: "A Collector Comes", titleSi: "එකතු කරන්නෙක් පැමිණේ", text: "A verified collector accepts the job and collects your sorted waste.", textSi: "තහවුරු කළ එකතු කරන්නෙක් ඉල්ලීම භාරගෙන කසළ එකතු කරයි." },
-  { n: "04", icon: "✅", title: "You Confirm", titleSi: "ඔබ තහවුරු කරන්න", text: "Confirm the pickup and the collector earns 100 coins.", textSi: "එකතු කිරීම තහවුරු කළ විට එකතු කරන්නාට coins 100ක් ලැබේ." },
+const householdSteps = [
+  { si: "කසළ වෙන් කරන්න", en: "Sort your waste", textSi: "ප්ලාස්ටික්, කඩදාසි, ලෝහ, වීදුරු වෙන වෙනම තබන්න.", textEn: "Keep plastic, paper, metal and glass apart." },
+  { si: "නොමිලේ ඉල්ලන්න", en: "Request for free", textSi: "දිස්ත්‍රික්කය, දිනය සහ වේලාව තෝරන්න.", textEn: "Choose your district, a date and a time." },
+  { si: "එකතු කරන්නා පැමිණේ", en: "A collector comes", textSi: "තහවුරු කළ එකතු කරන්නෙක් ඔබේ නිවසට පැමිණේ.", textEn: "A verified collector comes to your home." },
+  { si: "ඔබ තහවුරු කරන්න", en: "You confirm", textSi: "එකතු කිරීම සිදු වූ බව එක් click එකකින් තහවුරු කරන්න.", textEn: "Confirm the pickup happened with one tap." },
+];
+
+const collectorSteps = [
+  { si: "ලියාපදිංචි වන්න", en: "Register", textSi: "නම, දුරකථන අංකය සහ සේවා ප්‍රදේශය දෙන්න.", textEn: "Give your name, phone and service area." },
+  { si: "තහවුරු වන්න", en: "Get verified", textSi: "NextGen කණ්ඩායම ඔබව තහවුරු කරයි.", textEn: "The NextGen team verifies you." },
+  { si: "ඉල්ලීම් භාරගන්න", en: "Accept jobs", textSi: "ඔබේ දිස්ත්‍රික්කයේ ඉල්ලීම් තෝරා එකතු කරන්න.", textEn: "Pick jobs in your district and collect." },
+  { si: "Coins උපයන්න", en: "Earn coins", textSi: `තහවුරු කළ සෑම එකතු කිරීමකටම coins ${COINS_PER_PICKUP}ක්.`, textEn: `${COINS_PER_PICKUP} coins for every confirmed pickup.` },
 ];
 
 const categories = [
-  { image: "/waste-categories/plastic.webp", title: "Plastic", titleSi: "ප්ලාස්ටික්", items: "Bottles, containers, packaging", itemsSi: "බෝතල්, බඳුන් සහ ඇසුරුම්", color: "mint" },
-  { image: "/waste-categories/paper.webp", title: "Paper & Cardboard", titleSi: "කඩදාසි සහ කාඩ්බෝඩ්", items: "Newspapers, cardboard, paper", itemsSi: "පුවත්පත්, කාඩ්බෝඩ් සහ කඩදාසි", color: "sand" },
-  { image: "/waste-categories/metal.webp", title: "Metal", titleSi: "ලෝහ", items: "Cans, tins, metal items", itemsSi: "කෑන්, ටින් සහ ලෝහ භාණ්ඩ", color: "blue" },
-  { image: "/waste-categories/glass.webp", title: "Glass", titleSi: "වීදුරු", items: "Glass bottles and jars", itemsSi: "වීදුරු බෝතල් සහ බරණි", color: "aqua" },
-  { image: "/waste-categories/organic.webp", title: "Organic", titleSi: "කාබනික කසළ", items: "Food and garden waste", itemsSi: "ආහාර සහ ගෙවතු කසළ", color: "lime" },
-  { image: "/waste-categories/e-waste.webp", title: "E-Waste", titleSi: "ඉලෙක්ට්‍රොනික කසළ", items: "Old electronics and devices", itemsSi: "පැරණි ඉලෙක්ට්‍රොනික උපකරණ", color: "coral" },
+  { image: "/waste-categories/plastic.webp", si: "ප්ලාස්ටික්", en: "Plastic", itemsSi: "බෝතල්, බඳුන්, ඇසුරුම්", itemsEn: "Bottles, containers, packaging" },
+  { image: "/waste-categories/paper.webp", si: "කඩදාසි සහ කාඩ්බෝඩ්", en: "Paper & cardboard", itemsSi: "පුවත්පත්, පෙට්ටි, කඩදාසි", itemsEn: "Newspapers, boxes, paper" },
+  { image: "/waste-categories/metal.webp", si: "ලෝහ", en: "Metal", itemsSi: "කෑන්, ටින්, ලෝහ භාණ්ඩ", itemsEn: "Cans, tins, metal items" },
+  { image: "/waste-categories/glass.webp", si: "වීදුරු", en: "Glass", itemsSi: "වීදුරු බෝතල් සහ බරණි", itemsEn: "Glass bottles and jars" },
+  { image: "/waste-categories/organic.webp", si: "කාබනික කසළ", en: "Organic", itemsSi: "ආහාර සහ ගෙවතු කසළ", itemsEn: "Food and garden waste" },
+  { image: "/waste-categories/e-waste.webp", si: "ඉලෙක්ට්‍රොනික කසළ", en: "E-waste", itemsSi: "පැරණි ඉලෙක්ට්‍රොනික උපකරණ", itemsEn: "Old electronics and devices" },
 ];
 
 type Coordinates = { latitude: number; longitude: number };
@@ -62,11 +70,10 @@ const geocodeErrorsSi: Record<string, string> = {
   "Location search is temporarily unavailable.": "ස්ථාන සෙවීම තාවකාලිකව ලබාගත නොහැක.",
   "Location search is busy. Please try again in a moment.": "ස්ථාන සෙවීම කාර්යබහුලයි. මොහොතකින් නැවත උත්සාහ කරන්න.",
   "Too many attempts. Please wait and try again.": "උත්සාහයන් වැඩියි. ටික වේලාවකින් නැවත උත්සාහ කරන්න.",
+  "Enter a Sri Lankan location.": "ශ්‍රී ලංකාවේ ස්ථානයක් ඇතුළත් කරන්න.",
 };
 
 export default function Home() {
-  const { t, isSi, language } = useLanguage();
-  const [menuOpen, setMenuOpen] = useState(false);
   const [location, setLocation] = useState("");
   const [searching, setSearching] = useState(false);
   const [locationError, setLocationError] = useState("");
@@ -97,7 +104,7 @@ export default function Home() {
       {
         name: "find_collection_point",
         title: "Find the nearest collection point",
-        description: "Find the nearest EcoLoop district hub to a town, city or address in Sri Lanka. Hubs accept all recyclable waste types.",
+        description: "Find the nearest NextGen district hub to a town, city or address in Sri Lanka. Hubs accept all recyclable waste types.",
         inputSchema: { type: "object", properties: { location: { type: "string" } }, required: ["location"], additionalProperties: false },
         annotations: { readOnlyHint: true, untrustedContentHint: false },
         async execute(input: unknown) {
@@ -106,8 +113,8 @@ export default function Home() {
           const nearest = nearestHub(await geocode(query));
           setLocation(query);
           setHub(nearest);
-          document.querySelector("#collection-points")?.scrollIntoView({ behavior: "smooth" });
-          return { hub: `EcoLoop District Hub — ${nearest.value}`, district: nearest.value, distanceKm: Math.round(nearest.distanceKm * 10) / 10, sampleLocation: true };
+          document.querySelector("#hubs")?.scrollIntoView({ behavior: "smooth" });
+          return { hub: `NextGen District Hub — ${nearest.value}`, district: nearest.value, distanceKm: Math.round(nearest.distanceKm * 10) / 10, plannedLocation: true };
         },
       },
       { signal: lifecycle.signal },
@@ -116,19 +123,11 @@ export default function Home() {
     return () => lifecycle.abort();
   }, []);
 
-  function goHome(event: MouseEvent<HTMLAnchorElement>) {
-    if (window.location.pathname !== "/") return;
-    event.preventDefault();
-    window.history.replaceState(null, "", "/");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    setMenuOpen(false);
-  }
-
   async function submitSearch(event: FormEvent) {
     event.preventDefault();
     const query = location.trim();
     if (!query) {
-      setLocationError(t("Enter a Sri Lankan town, city, or address.", "ශ්‍රී ලංකාවේ නගරයක්, ප්‍රදේශයක් හෝ ලිපිනයක් ඇතුළත් කරන්න."));
+      setLocationError("Enter a Sri Lankan location.");
       return;
     }
     setSearching(true);
@@ -136,288 +135,318 @@ export default function Home() {
     try {
       setHub(nearestHub(await geocode(query)));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Location not found in Sri Lanka.";
       setHub(null);
-      setLocationError(isSi ? geocodeErrorsSi[message] ?? message : message);
+      setLocationError(error instanceof Error ? error.message : "Location not found in Sri Lanka.");
     } finally {
       setSearching(false);
     }
   }
 
-  const statValue = (value: number | undefined) => (stats ? (value ?? 0).toLocaleString() : "—");
+  const statValue = (value: number | undefined) => (stats ? (value ?? 0).toLocaleString("en-LK") : "—");
 
   return (
-    <main>
-      <header className="navbar">
-        <Link className="logo" href="/" onClick={goHome}>
-          <span className="logo-mark">↻</span>
-          <span>
-            <b>EcoLoop</b>
-            <small>{t("Smart Waste Management", "බුද්ධිමත් කසළ කළමනාකරණය")}</small>
-          </span>
-        </Link>
-        <button className="menu-button" aria-label={t("Toggle menu", "මෙනුව")} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>
-          ☰
-        </button>
-        <nav className={menuOpen ? "nav-links open" : "nav-links"} onClick={() => setMenuOpen(false)}>
-          <Link href="/" onClick={goHome}>
-            {t("Home", "මුල් පිටුව")}
-          </Link>
-          <a href="#how">{t("How It Works", "ක්‍රියා කරන ආකාරය")}</a>
-          <a href="#collection-points">{t("Collection Points", "එකතු කිරීමේ ස්ථාන")}</a>
-          <Link href="/system?role=household">{t("My Requests", "මගේ ඉල්ලීම්")}</Link>
-        </nav>
-        <LanguageToggle />
-        <div className="nav-actions">
-          <Link className="dashboard-link" href="/system?role=collector">
-            🚛 {t("Collector", "එකතු කරන්නා")}
-          </Link>
-          <Link className="button button-small" href="/system?role=household">
-            <span>♻</span> {t("Request Pickup", "එකතු කිරීමක් ඉල්ලන්න")}
-          </Link>
-        </div>
-      </header>
-
-      <section className="hero section" id="home">
-        <div className="hero-copy">
-          <p className="badge">
-            <span>♻</span> {t("Smart Waste Management for a Cleaner Sri Lanka", "පිරිසිදු ශ්‍රී ලංකාවක් සඳහා බුද්ධිමත් කසළ කළමනාකරණය")}
-          </p>
-          <h1>
-            {t("Turn Your Waste Into a", "ඔබේ කසළ")} <em>{t("Better Tomorrow.", "හොඳ හෙටක් බවට පත් කරන්න.")}</em>
-          </h1>
-          <p className="hero-text">
-            {t(
-              "Sort your waste, request a free pickup from a verified collector, and find your nearest collection point.",
-              "කසළ වෙන් කරන්න, තහවුරු කළ එකතු කරන්නෙකුගෙන් නොමිලේ එකතු කිරීමක් ඉල්ලන්න, ළඟම එකතු කිරීමේ ස්ථානය සොයන්න.",
-            )}
-          </p>
-          <div className="hero-actions">
-            <Link className="button" href="/system?role=household">
-              <span>♻</span> {t("Request a Pickup", "එකතු කිරීමක් ඉල්ලන්න")}
-            </Link>
-            <Link className="button button-ghost" href="/system?role=collector">
-              <span>🚛</span> {t("Collector Portal", "එකතු කරන්නාගේ පිටුව")}
-            </Link>
-          </div>
-          <div className="hero-stats" aria-live="polite">
-            <div>
-              <strong>{statValue(stats?.completedPickups)}</strong>
-              <span>{t("Pickups completed", "සම්පූර්ණ කළ එකතු කිරීම්")}</span>
-            </div>
-            <div>
-              <strong>{stats ? `${statValue(stats.kgRecycled)} kg` : "—"}</strong>
-              <span>{t("Waste collected", "එකතු කළ කසළ")}</span>
-            </div>
-            <div>
-              <strong>{statValue(stats?.verifiedCollectors)}</strong>
-              <span>{t("Verified collectors", "තහවුරු කළ එකතු කරන්නන්")}</span>
-            </div>
-          </div>
-        </div>
-        <div className="hero-visual hero-map-visual" aria-label={t("EcoLoop district hubs across Sri Lanka", "ශ්‍රී ලංකාව පුරා EcoLoop දිස්ත්‍රික් hubs")}>
-          <div className="hero-map-glow"></div>
-          <Image
-            className="hero-map-image"
-            src="/sri-lanka-eco-map.png"
-            alt={t("Green map of Sri Lanka", "ශ්‍රී ලංකාවේ කොළ පැහැති සිතියම")}
-            width={1024}
-            height={1536}
-            priority
-          />
-          <div className="hero-map-chip chip-network">
-            <span>●</span>
-            <div>
-              <b>{t(`${DISTRICTS.length} district hubs`, `දිස්ත්‍රික් hubs ${DISTRICTS.length}`)}</b>
-              <small>{t("Islandwide network", "දිවයින පුරා ජාලය")}</small>
-            </div>
-          </div>
-          <div className="hero-map-chip chip-impact">
-            <span>♻</span>
-            <div>
-              <b>{t("Free pickups", "නොමිලේ එකතු කිරීම්")}</b>
-              <small>{t("For every household", "සෑම නිවසකටම")}</small>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="section centered" id="how">
-        <p className="kicker">{t("HOW IT WORKS", "ක්‍රියා කරන ආකාරය")}</p>
-        <h2>
-          {t("Waste Management", "කසළ කළමනාකරණය")} <em>{t("Made Simple.", "සරලව.")}</em>
-        </h2>
-        <p className="section-intro">
-          {t("From sorting your waste to a confirmed pickup, everything happens in four simple steps.", "කසළ වෙන් කිරීමේ සිට තහවුරු කළ එකතු කිරීම දක්වා සියල්ල සරල පියවර හතරකින්.")}
-        </p>
-        <div className="steps-grid">
-          {steps.map((step, index) => (
-            <article className="step-card" key={step.title}>
-              <span className="step-number">{step.n}</span>
-              <div className="step-icon">{step.icon}</div>
-              <h3>{isSi ? step.titleSi : step.title}</h3>
-              <p>{isSi ? step.textSi : step.text}</p>
-              {index < steps.length - 1 && <span className="step-arrow">→</span>}
-            </article>
-          ))}
-        </div>
-        <div className="how-tools">
-          <a href="#categories">
-            <span>📷</span>
-            <b>{t("Scan & identify waste", "කසළ Scan කර හඳුනාගන්න")}</b>
-            <small>{t("Waste categories", "කසළ වර්ග")}</small>
-          </a>
-          <a href="#collection-points">
-            <span>📍</span>
-            <b>{t("Find your nearest hub", "ළඟම hub එක සොයන්න")}</b>
-            <small>{t("Collection points", "එකතු කිරීමේ ස්ථාන")}</small>
-          </a>
-          <Link href="/system?role=household">
-            <span>🏠</span>
-            <b>{t("Request a pickup", "එකතු කිරීමක් ඉල්ලන්න")}</b>
-            <small>{t("Household portal", "නිවාස පිටුව")}</small>
-          </Link>
-          <Link href="/system?role=household">
-            <span>📋</span>
-            <b>{t("Track my requests", "මගේ ඉල්ලීම් බලන්න")}</b>
-            <small>{t("Confirm completed pickups", "එකතු කිරීම් තහවුරු කරන්න")}</small>
-          </Link>
-        </div>
-      </section>
-
-      <section className="category-section" id="categories">
-        <div className="section">
-          <div className="section-heading-row">
-            <div>
-              <p className="kicker">{t("WASTE CATEGORIES", "කසළ වර්ග")}</p>
-              <h2>
-                {t("Know Your", "ඔබේ කසළ")} <em>{t("Waste.", "හඳුනාගන්න.")}</em>
-              </h2>
-            </div>
-            <p>
-              {t(
-                "Identify the right category before you request a pickup. You can also choose “Mixed Recyclables”.",
-                "එකතු කිරීමක් ඉල්ලීමට පෙර නිවැරදි කාණ්ඩය හඳුනාගන්න. “මිශ්‍ර ප්‍රතිචක්‍රීකරණ” ලෙසද තේරිය හැක.",
-              )}
-            </p>
-          </div>
-          <div className="category-grid">
-            {categories.map((category) => (
-              <article className={`category-card ${category.color}`} key={category.title}>
-                <div className="category-thumb">
-                  <Image src={category.image} alt={isSi ? category.titleSi : `${category.title} recyclable waste`} width={240} height={240} />
-                </div>
-                <div>
-                  <h3>{isSi ? category.titleSi : category.title}</h3>
-                  <p>{isSi ? category.itemsSi : category.items}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-          <div className="tip-bar">
-            <span>📷</span>
-            <div>
-              <b>{t("Not sure where your waste belongs?", "ඔබේ කසළ අයත් කාණ්ඩය විශ්වාස නැද්ද?")}</b>
-              <p>{t("Show one item to your camera and scan it automatically.", "එක භාණ්ඩයක් camera එකට පෙන්වා automatically scan කරන්න.")}</p>
-            </div>
-            <button
-              type="button"
-              onPointerEnter={() => void preloadWasteModel().catch(() => undefined)}
-              onFocus={() => void preloadWasteModel().catch(() => undefined)}
-              onClick={() => setScannerOpen(true)}
-            >
-              {t("Scan Waste", "කසළ Scan කරන්න")} <span>→</span>
-            </button>
-          </div>
-          {scannerOpen && <WasteScanner language={language} onClose={() => setScannerOpen(false)} />}
-        </div>
-      </section>
-
-      <section className="map-section" id="collection-points">
-        <div className="section">
-          <div className="map-title">
-            <p className="kicker">{t("COLLECTION POINTS", "එකතු කිරීමේ ස්ථාන")}</p>
-            <h2>
-              {t("Find a Collection Point", "ඔබට ආසන්න එකතු කිරීමේ ස්ථානයක්")} <em>{t("Near You", "සොයාගන්න")}</em>
-            </h2>
-            <p>
-              {t("Type your town to see the nearest EcoLoop district hub. Every hub accepts all recyclable waste types.", "ළඟම EcoLoop දිස්ත්‍රික් hub එක බැලීමට ඔබේ නගරය ලියන්න. සෑම hub එකක්ම සියලු ප්‍රතිචක්‍රීකරණ කසළ භාරගනී.")}
-            </p>
-          </div>
-          <div className="sample-notice">
-            <span>●</span>
-            <div>
-              <b>{t("Planned district hubs", "සැලසුම් කළ දිස්ත්‍රික් hubs")}</b>
-              <small>
-                {t("Hubs are shown at each district's main town. Exact addresses will be added as each hub opens.", "Hubs පෙන්වා ඇත්තේ එක් එක් දිස්ත්‍රික්කයේ ප්‍රධාන නගරයේය. Hub එක විවෘත වන විට නිවැරදි ලිපිනය එක් කෙරේ.")}
-              </small>
-            </div>
-          </div>
-          <div className="finder-layout collection-finder">
-            <form className="finder-panel simple-finder" onSubmit={submitSearch}>
-              <h3>🔍 {t("Find the nearest collection point", "ළඟම එකතු කිරීමේ ස්ථානය සොයන්න")}</h3>
-              <p className="finder-help">{t("Type your town or area below.", "ඔබේ නගරය හෝ ප්‍රදේශය පහළින් ලියන්න.")}</p>
-              <label>
-                <span>{t("YOUR AREA", "ඔබේ ප්‍රදේශය")}</span>
-                <div className="search-input">
-                  <i>⌖</i>
-                  <input value={location} onChange={(e) => setLocation(e.target.value)} maxLength={120} placeholder={t("Example: Kandy", "උදාහරණය: මහනුවර")} />
-                </div>
-              </label>
-              {locationError && (
-                <small className="location-error" role="alert">
-                  {locationError}
-                </small>
-              )}
-              <button className="button search-button" type="submit" disabled={searching}>
-                {searching ? t("Searching...", "සොයමින්...") : t("Find Nearest Hub", "ළඟම hub එක සොයන්න")} {!searching && <span>→</span>}
-              </button>
-              <small className="location-attribution">{t("Location data © OpenStreetMap contributors.", "ස්ථාන දත්ත © OpenStreetMap දායකයින්.")}</small>
-              {hub ? (
-                <div className="collection-details" aria-live="polite">
-                  <div className="details-topline">
-                    <span className="sample-data-badge">{t("NEAREST HUB", "ළඟම HUB එක")}</span>
-                  </div>
-                  <h3>
-                    {t("EcoLoop District Hub", "EcoLoop දිස්ත්‍රික් hub")} — {isSi ? hub.si : hub.value}
-                  </h3>
-                  <div className="detail-row">
-                    <span>📏</span>
-                    <p>
-                      <b>{formatDistance(hub.distanceKm)}</b> {t("from your area", "ඔබේ ප්‍රදේශයේ සිට")}
-                    </p>
-                  </div>
-                  <div className="detail-row">
-                    <span>🕐</span>
-                    <p>{t("Mon – Sat: 8:00 AM – 5:00 PM · Sunday: Closed", "සඳුදා – සෙනසුරාදා: පෙ.ව. 8:00 – ප.ව. 5:00 · ඉරිදා: වසා ඇත")}</p>
-                  </div>
-                  <div className="detail-actions">
-                    <a href={`https://www.google.com/maps/dir/?api=1&destination=${hub.latitude},${hub.longitude}`} target="_blank" rel="noreferrer">
-                      📍 {t("Get Directions", "මාර්ගය බලන්න")}
-                    </a>
-                    <Link href="/system?role=household">♻ {t("Or request a pickup", "නැත්නම් එකතු කිරීමක් ඉල්ලන්න")}</Link>
-                  </div>
-                </div>
-              ) : (
-                <div className="no-results" role="status">
-                  {t("Enter your area and press the green button.", "ඔබේ ප්‍රදේශය ලියා කොළ පැහැති button එක ඔබන්න.")}
-                </div>
-              )}
-            </form>
-            <div className="map-panel">
-              <iframe
-                key={hub?.value ?? "sri-lanka"}
-                title={hub ? t(`Map of the ${hub.value} district hub`, `${hub.si} hub සිතියම`) : t("Map of Sri Lanka", "ශ්‍රී ලංකා සිතියම")}
-                src={mapUrl(hub)}
-                loading="lazy"
-                referrerPolicy="no-referrer"
+    <>
+      <SiteHeader />
+      <main id="main">
+        <section className="hero">
+          <div className="container hero__grid">
+            <div className="hero__copy">
+              <Bi as="p" className="eyebrow" si="පිරිසිදු ශ්‍රී ලංකාවක් සඳහා" en="For a cleaner Sri Lanka" />
+              <h1 className="hero__title">
+                <Bi stack si="ඔබේ කසළ, හොඳ හෙටක් බවට." en="Turn your waste into a better tomorrow." />
+              </h1>
+              <Bi
+                as="p"
+                stack
+                className="hero__lead"
+                si="නිවාසවලට නොමිලේ කසළ එකතු කිරීම, සහ කසළ එකතු කරන්නන්ට ආදායමක්. එකම වේදිකාවකින්."
+                en="Free pickups for households and rewards for collectors, on one platform."
               />
+
+              <div className="paths">
+                <Link className="path-card" href="/system?role=household">
+                  <span className="path-card__icon" aria-hidden="true">
+                    🏠
+                  </span>
+                  <Bi as="span" stack className="path-card__title" si="මට කසළ තියෙනවා" en="I have waste" />
+                  <Bi as="span" stack className="path-card__text" si="නොමිලේ එකතු කිරීමක් ඉල්ලන්න." en="Request a free pickup." />
+                  <span className="path-card__cta" aria-hidden="true">
+                    →
+                  </span>
+                </Link>
+                <Link className="path-card path-card--alt" href="/system?role=collector">
+                  <span className="path-card__icon" aria-hidden="true">
+                    🚛
+                  </span>
+                  <Bi as="span" stack className="path-card__title" si="මම කසළ එකතු කරනවා" en="I collect waste" />
+                  <Bi as="span" stack className="path-card__text" si="ලියාපදිංචි වී coins උපයන්න." en="Register and earn coins." />
+                  <span className="path-card__cta" aria-hidden="true">
+                    →
+                  </span>
+                </Link>
+              </div>
+            </div>
+
+            <div className="hero__visual">
+              <Image
+                className="hero__map"
+                src="/sri-lanka-eco-map.png"
+                alt={bi("ශ්‍රී ලංකාවේ කොළ පැහැති සිතියම", "Green map of Sri Lanka")}
+                width={1024}
+                height={1536}
+                priority
+              />
+              <dl className="stats" aria-live="polite">
+                <div className="stat">
+                  <dt>
+                    <Bi stack si="සම්පූර්ණ කළ එකතු කිරීම්" en="Pickups completed" />
+                  </dt>
+                  <dd>{statValue(stats?.completedPickups)}</dd>
+                </div>
+                <div className="stat">
+                  <dt>
+                    <Bi stack si="එකතු කළ කසළ" en="Waste collected" />
+                  </dt>
+                  <dd>
+                    {statValue(stats?.kgRecycled)}
+                    {stats && <small> kg</small>}
+                  </dd>
+                </div>
+                <div className="stat">
+                  <dt>
+                    <Bi stack si="තහවුරු කළ එකතු කරන්නන්" en="Verified collectors" />
+                  </dt>
+                  <dd>{statValue(stats?.verifiedCollectors)}</dd>
+                </div>
+              </dl>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
+        <section className="section" id="how" aria-labelledby="how-title">
+          <div className="container">
+            <header className="section-head">
+              <Bi as="p" className="eyebrow" si="ක්‍රියා කරන ආකාරය" en="How it works" />
+              <h2 id="how-title">
+                <Bi stack si="පියවර හතරයි. දෙපැත්තටම." en="Four steps, for both sides." />
+              </h2>
+            </header>
+            <div className="tracks">
+              {[
+                { key: "household", icon: "🏠", si: "නිවාස සඳහා", en: "For households", steps: householdSteps, href: "/system?role=household", ctaSi: "එකතු කිරීමක් ඉල්ලන්න", ctaEn: "Request a pickup" },
+                { key: "collector", icon: "🚛", si: "එකතු කරන්නන් සඳහා", en: "For collectors", steps: collectorSteps, href: "/system?role=collector", ctaSi: "ලියාපදිංචි වන්න", ctaEn: "Register as a collector" },
+              ].map((track) => (
+                <article className={`track track--${track.key}`} key={track.key}>
+                  <h3 className="track__title">
+                    <span aria-hidden="true">{track.icon}</span>
+                    <Bi stack si={track.si} en={track.en} />
+                  </h3>
+                  <ol className="steps">
+                    {track.steps.map((step, index) => (
+                      <li className="step" key={step.en}>
+                        <span className="step__num" aria-hidden="true">
+                          {index + 1}
+                        </span>
+                        <div>
+                          <Bi as="h4" stack className="step__title" si={step.si} en={step.en} />
+                          <Bi as="p" stack className="step__text" si={step.textSi} en={step.textEn} />
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                  <Link className={track.key === "household" ? "btn btn--primary" : "btn btn--secondary"} href={track.href}>
+                    <Bi si={track.ctaSi} en={track.ctaEn} /> <span aria-hidden="true">→</span>
+                  </Link>
+                </article>
+              ))}
+            </div>
+            <ul className="promises">
+              <li>
+                <span aria-hidden="true">✓</span>
+                <Bi stack si="නිවාසවලට සම්පූර්ණයෙන්ම නොමිලේ" en="Always free for households" />
+              </li>
+              <li>
+                <span aria-hidden="true">✓</span>
+                <Bi stack si="තහවුරු කළ එකතු කරන්නන් පමණි" en="Only verified collectors" />
+              </li>
+              <li>
+                <span aria-hidden="true">✓</span>
+                <Link href="/privacy">
+                  <Bi stack si="ඔබේ තොරතුරු ආරක්ෂිතයි" en="Your details stay private" />
+                </Link>
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <section className="section section--tint" id="waste" aria-labelledby="waste-title">
+          <div className="container">
+            <header className="section-head section-head--split">
+              <div>
+                <Bi as="p" className="eyebrow" si="කසළ වර්ග" en="Waste types" />
+                <h2 id="waste-title">
+                  <Bi stack si="ඔබේ කසළ හඳුනාගන්න." en="Know your waste." />
+                </h2>
+              </div>
+              <Bi
+                as="p"
+                stack
+                className="section-head__lead"
+                si="ඉල්ලීමක් දැමීමට පෙර නිවැරදි වර්ගය තෝරන්න. විශ්වාස නැත්නම් “මිශ්‍ර ප්‍රතිචක්‍රීකරණ” තෝරන්න."
+                en="Pick the right type before you request. Not sure? Choose “Mixed recyclables”."
+              />
+            </header>
+            <ul className="waste-grid">
+              {categories.map((category) => (
+                <li className="waste-card" key={category.en}>
+                  <Image className="waste-card__img" src={category.image} alt={bi(category.si, category.en)} width={240} height={240} />
+                  <div>
+                    <Bi as="h3" stack className="waste-card__title" si={category.si} en={category.en} />
+                    <Bi as="p" stack className="waste-card__text" si={category.itemsSi} en={category.itemsEn} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <div className="scan-cta">
+              <span className="scan-cta__icon" aria-hidden="true">
+                📷
+              </span>
+              <div>
+                <Bi as="h3" stack si="කුමන වර්ගයද කියා විශ්වාස නැද්ද?" en="Not sure which type it is?" />
+                <Bi as="p" stack si="එක භාණ්ඩයක් camera එකට පෙන්වන්න. පින්තූර upload කරන්නේ නැහැ." en="Show one item to your camera. No photos are uploaded." />
+              </div>
+              <button
+                type="button"
+                className="btn btn--primary"
+                onPointerEnter={() => void preloadWasteModel().catch(() => undefined)}
+                onFocus={() => void preloadWasteModel().catch(() => undefined)}
+                onClick={() => setScannerOpen(true)}
+              >
+                <Bi si="කසළ Scan කරන්න" en="Scan waste" />
+              </button>
+            </div>
+          </div>
+          {scannerOpen && <WasteScanner onClose={() => setScannerOpen(false)} />}
+        </section>
+
+        <section className="section" id="hubs" aria-labelledby="hubs-title">
+          <div className="container">
+            <header className="section-head">
+              <Bi as="p" className="eyebrow" si="එකතු කිරීමේ ස්ථාන" en="Collection hubs" />
+              <h2 id="hubs-title">
+                <Bi stack si="ඔබට ළඟම hub එක සොයන්න." en="Find your nearest hub." />
+              </h2>
+              <Bi
+                as="p"
+                stack
+                className="section-head__lead"
+                si={`දිස්ත්‍රික්ක ${DISTRICTS.length}ක සැලසුම් කළ hubs. සෑම hub එකක්ම සියලු ප්‍රතිචක්‍රීකරණ කසළ භාරගනී.`}
+                en={`Planned hubs in all ${DISTRICTS.length} districts. Every hub accepts all recyclable waste.`}
+              />
+            </header>
+            <div className="finder">
+              <form className="finder__panel" onSubmit={submitSearch}>
+                <label className="field">
+                  <Bi className="field__label" si="ඔබේ නගරය හෝ ප්‍රදේශය" en="Your town or area" />
+                  <input
+                    className="input"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    maxLength={120}
+                    placeholder={bi("උදා: මහනුවර", "e.g. Kandy")}
+                  />
+                </label>
+                {locationError && (
+                  <p className="field__error" role="alert">
+                    <Bi stack si={geocodeErrorsSi[locationError] ?? locationError} en={locationError} />
+                  </p>
+                )}
+                <button className="btn btn--primary btn--block" type="submit" disabled={searching}>
+                  {searching ? <Bi si="සොයමින්..." en="Searching..." /> : <Bi si="ළඟම hub එක සොයන්න" en="Find nearest hub" />}
+                </button>
+
+                {hub ? (
+                  <div className="hub-card" aria-live="polite">
+                    <Bi as="p" className="hub-card__label" si="ළඟම hub එක" en="Nearest hub" />
+                    <h3 className="hub-card__name">
+                      <Bi stack si={`${hub.si} දිස්ත්‍රික් hub`} en={`${hub.value} district hub`} />
+                    </h3>
+                    <p className="hub-card__row">
+                      <span aria-hidden="true">📏</span>
+                      <span>
+                        <b>{formatDistance(hub.distanceKm)}</b> <Bi si="ඔබේ ප්‍රදේශයේ සිට" en="from your area" />
+                      </span>
+                    </p>
+                    <p className="hub-card__row">
+                      <span aria-hidden="true">🕐</span>
+                      <Bi stack si="සඳු – සෙන: පෙ.ව. 8 – ප.ව. 5 · ඉරිදා වසා ඇත" en="Mon – Sat: 8 AM – 5 PM · Closed Sunday" />
+                    </p>
+                    <div className="hub-card__actions">
+                      <a className="btn btn--secondary btn--sm" href={`https://www.google.com/maps/dir/?api=1&destination=${hub.latitude},${hub.longitude}`} target="_blank" rel="noreferrer">
+                        <Bi si="මාර්ගය" en="Directions" />
+                      </a>
+                      <Link className="btn btn--ghost btn--sm" href="/system?role=household">
+                        <Bi si="නැත්නම් ගෙදරටම ගෙන්වන්න" en="Or request a pickup" />
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <Bi as="p" stack className="finder__hint" si="ඔබේ නගරය ලියා බොත්තම ඔබන්න." en="Type your town and press the button." />
+                )}
+                <p className="finder__note">
+                  <Bi stack si="Hub ස්ථාන දැනට සැලසුම් මට්ටමේ ඇත. නිවැරදි ලිපින විවෘත වන විට එක් කෙරේ." en="Hub locations are planned; exact addresses are added as each hub opens." />
+                  <small>Map data © OpenStreetMap contributors</small>
+                </p>
+              </form>
+              <div className="finder__map">
+                <iframe
+                  key={hub?.value ?? "sri-lanka"}
+                  title={hub ? bi(`${hub.si} hub සිතියම`, `Map of the ${hub.value} hub`) : bi("ශ්‍රී ලංකා සිතියම", "Map of Sri Lanka")}
+                  src={mapUrl(hub)}
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="section" id="collectors" aria-labelledby="collectors-title">
+          <div className="container">
+            <div className="collect-band">
+              <div className="collect-band__copy">
+                <Bi as="p" className="eyebrow" si="එකතු කරන්නන්ට" en="For collectors" />
+                <h2 id="collectors-title">
+                  <Bi stack si="එකතු කරන්න. Coins උපයන්න." en="Collect waste. Earn coins." />
+                </h2>
+                <Bi
+                  as="p"
+                  stack
+                  si={`නිවස තහවුරු කරන සෑම එකතු කිරීමකටම coins ${COINS_PER_PICKUP}ක් ලැබේ. Coins ත්‍යාග සඳහා මුදාගන්න.`}
+                  en={`Every pickup the household confirms earns ${COINS_PER_PICKUP} coins. Redeem coins for rewards.`}
+                />
+                <Link className="btn btn--primary" href="/system?role=collector">
+                  <Bi si="එකතු කරන්නෙකු ලෙස එක්වන්න" en="Join as a collector" /> <span aria-hidden="true">→</span>
+                </Link>
+              </div>
+              <ul className="reward-list">
+                {REWARDS.map((reward) => (
+                  <li className="reward-list__item" key={reward.name}>
+                    <span className="reward-list__icon" aria-hidden="true">
+                      {reward.icon}
+                    </span>
+                    <Bi stack si={reward.si} en={reward.name} />
+                    <span className="reward-list__points">
+                      {reward.points.toLocaleString("en-LK")} <small>coins</small>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+      </main>
       <SiteFooter />
-    </main>
+    </>
   );
 }

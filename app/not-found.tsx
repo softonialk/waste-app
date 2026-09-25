@@ -1,23 +1,28 @@
-"use client";
-
 import Link from "next/link";
-import { useLanguage } from "./components/language";
+import { Bi } from "./components/bi";
+import SiteFooter from "./components/site-footer";
+import SiteHeader from "./components/site-header";
 
 export default function NotFound() {
-  const { t } = useLanguage();
   return (
-    <main className="status-page">
-      <span className="status-page-mark">♻</span>
-      <h1>{t("Page not found", "පිටුව හමු නොවීය")}</h1>
-      <p>{t("This page may have moved, or the link may be wrong.", "මෙම පිටුව ඉවත් කර තිබිය හැක, නැත්නම් සබැඳිය වැරදි විය හැක.")}</p>
-      <div className="status-page-actions">
-        <Link className="button" href="/">
-          {t("Go to the home page", "මුල් පිටුවට යන්න")}
-        </Link>
-        <Link className="button button-ghost" href="/system?role=household">
-          {t("Request a pickup", "එකතු කිරීමක් ඉල්ලන්න")}
-        </Link>
-      </div>
-    </main>
+    <>
+      <SiteHeader />
+      <main id="main" className="status-page">
+        <p className="status-page__code">404</p>
+        <h1>
+          <Bi stack si="පිටුව හමු නොවීය" en="Page not found" />
+        </h1>
+        <Bi as="p" stack si="මෙම පිටුව ඉවත් කර තිබිය හැක, නැත්නම් සබැඳිය වැරදියි." en="This page may have moved, or the link may be wrong." />
+        <div className="status-page__actions">
+          <Link className="btn btn--primary" href="/">
+            <Bi si="මුල් පිටුවට" en="Go home" />
+          </Link>
+          <Link className="btn btn--ghost" href="/system?role=household">
+            <Bi si="එකතු කිරීමක් ඉල්ලන්න" en="Request a pickup" />
+          </Link>
+        </div>
+      </main>
+      <SiteFooter />
+    </>
   );
 }

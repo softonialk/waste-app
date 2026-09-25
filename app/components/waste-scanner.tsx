@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Bi, bi, type Message } from "./bi";
 
-type Props = { language: "en" | "si"; onClose: () => void };
+type Props = { onClose: () => void };
 type ScanResult = { object: string; category: string; categorySi: string; confidence: number; caution?: boolean };
 type Prediction = { class: string; score: number };
 type CocoModel = { detect: (image: HTMLVideoElement, maxNumBoxes?: number, minScore?: number) => Promise<Prediction[]> };
@@ -53,15 +54,14 @@ const categoryByObject: Record<string, Omit<ScanResult, "object" | "confidence">
   bottle: { category: "Plastic or Glass", categorySi: "ප්ලාස්ටික් හෝ වීදුරු", caution: true }, cup: { category: "Plastic or Glass", categorySi: "ප්ලාස්ටික් හෝ වීදුරු", caution: true },
 };
 
-export default function WasteScanner({ language, onClose }: Props) {
-  const isSi = language === "si";
-  const t = (english: string, sinhala: string) => isSi ? sinhala : english;
+export default function WasteScanner({ onClose }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const busyRef = useRef(false);
+  const closeRef = useRef<HTMLButtonElement>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "scanning" | "error">("idle");
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<Message | null>(null);
   const [result, setResult] = useState<ScanResult | null>(null);
 
   function stopScanner() {
@@ -73,6 +73,7 @@ export default function WasteScanner({ language, onClose }: Props) {
 
   useEffect(() => {
     void preloadWasteModel().catch(() => undefined);
+    closeRef.current?.focus();
     return stopScanner;
   }, []);
 
@@ -88,7 +89,7 @@ export default function WasteScanner({ language, onClose }: Props) {
 
   async function startScanner() {
     setStatus("loading");
-    setMessage(t("Opening camera and loading the free AI model...", "Camera එක අරිමින් free AI model එක load කරමින්..."));
+    setMessage({ si: "Camera එක විවෘත කරමින් AI model එක load කරමින්...", en: "Opening the camera and loading the AI model..." });
     setResult(null);
     try {
       const pendingModel = preloadWasteModel();
@@ -99,7 +100,7 @@ export default function WasteScanner({ language, onClose }: Props) {
       await videoRef.current.play();
       const model = await pendingModel;
       setStatus("scanning");
-      setMessage(t("Hold one item inside the box. Scanning automatically...", "එක භාණ්ඩයක් කොටුව ඇතුළේ අල්ලන්න. Automatically scan වෙමින්..."));
+      setMessage({ si: "එක භාණ්ඩයක් කොටුව ඇතුළේ අල්ලන්න. ස්වයංක්‍රීයව scan වෙමින්...", en: "Hold one item inside the frame. Scanning automatically..." });
       timerRef.current = setInterval(async () => {
         if (busyRef.current || !videoRef.current || videoRef.current.readyState < 2) return;
         busyRef.current = true;
@@ -107,17 +108,80 @@ export default function WasteScanner({ language, onClose }: Props) {
           const predictions = await model.detect(videoRef.current, 6, 0.35);
           const match = predictions.filter((prediction) => categoryByObject[prediction.class]).sort((a, b) => b.score - a.score)[0];
           if (match) setResult({ object: match.class, confidence: Math.round(match.score * 100), ...categoryByObject[match.class] });
-        } finally { busyRef.current = false; }
+        } finally {
+          busyRef.current = false;
+        }
       }, 450);
     } catch (error) {
       stopScanner();
       setStatus("error");
       const denied = error instanceof DOMException && error.name === "NotAllowedError";
-      setMessage(denied ? t("Camera permission was not allowed. Please allow the camera and try again.", "Camera permission ලබාදී නැහැ. Camera එකට අවසර දී නැවත උත්සාහ කරන්න.") : t("The camera scanner could not start on this device.", "මෙම device එකේ camera scanner එක ආරම්භ කළ නොහැක."));
+      setMessage(
+        denied
+          ? { si: "Camera එකට අවසර ලැබුණේ නැහැ. අවසර දී නැවත උත්සාහ කරන්න.", en: "Camera permission was not allowed. Allow the camera and try again." }
+          : { si: "මෙම උපාංගයේ camera scanner එක ආරම්භ කළ නොහැක.", en: "The camera scanner could not start on this device." },
+      );
     }
   }
 
-  function close() { stopScanner(); onClose(); }
+  function close() {
+    stopScanner();
+    onClose();
+  }
 
-  return <div className="waste-guide-backdrop" role="presentation"><div className="waste-guide scanner-dialog" role="dialog" aria-modal="true" aria-labelledby="scanner-title"><button type="button" className="waste-guide-close" aria-label={t("Close scanner", "Scanner එක වසන්න")} onClick={close}>×</button><h3 id="scanner-title">📷 {t("Scan Your Waste", "ඔබේ කසළ Scan කරන්න")}</h3><p>{t("Point the camera at one item. No photo upload is needed.", "එක භාණ්ඩයකට camera එක අල්ලන්න. Photo upload කරන්න අවශ්‍ය නැහැ.")}</p><div className="scanner-camera"><video ref={videoRef} muted playsInline aria-label={t("Live camera preview", "සජීවී camera දසුන")}/><span className="scanner-frame"></span>{status === "idle" && <div className="scanner-placeholder">♻️<small>{t("Camera is off", "Camera එක off")}</small></div>}</div>{status === "idle" ? <button type="button" className="scanner-start" onClick={startScanner}>📷 {t("Start Camera Scan", "Camera Scan එක අරඹන්න")}</button> : <div className={`scanner-status ${status}`} role="status"><i></i>{message}</div>}{result && <div className="scanner-result" role="status"><span>✓</span><div><small>{t(`Detected: ${result.object} · ${result.confidence}% confidence`, `හඳුනාගත්තේ: ${result.object} · විශ්වාසය ${result.confidence}%`)}</small><b>{isSi ? result.categorySi : result.category}</b>{result.caution && <p>{t("Check the material: the free model can see a bottle or cup, but cannot reliably separate plastic from glass.", "ද්‍රව්‍යය බලන්න: free model එකට බෝතලය හඳුනාගත හැකි නමුත් plastic සහ glass නිවැරදිව වෙන් කරන්න බැහැ.")}</p>}</div></div>}{status === "error" && <button type="button" className="scanner-retry" onClick={startScanner}>{t("Try Again", "නැවත උත්සාහ කරන්න")}</button>}<small className="scanner-privacy">🔒 {t("The camera is analysed in your browser. Images are not uploaded.", "Camera දසුන browser එක තුළම පරීක්ෂා කරයි. Images upload කරන්නේ නැහැ.")}</small></div></div>;
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={(event) => event.target === event.currentTarget && close()}>
+      <div className="modal scanner" role="dialog" aria-modal="true" aria-labelledby="scanner-title">
+        <button ref={closeRef} type="button" className="modal__close" aria-label={bi("වසන්න", "Close")} onClick={close}>
+          ✕
+        </button>
+        <h2 id="scanner-title" className="modal__title">
+          <Bi stack si="ඔබේ කසළ Scan කරන්න" en="Scan your waste" />
+        </h2>
+        <div className="scanner__camera">
+          <video ref={videoRef} muted playsInline aria-label={bi("සජීවී camera දසුන", "Live camera preview")} />
+          <span className="scanner__frame" aria-hidden="true"></span>
+          {status === "idle" && (
+            <div className="scanner__placeholder">
+              <span aria-hidden="true">📷</span>
+              <Bi si="Camera එක off" en="Camera is off" />
+            </div>
+          )}
+        </div>
+        {status === "idle" ? (
+          <button type="button" className="btn btn--primary btn--block" onClick={startScanner}>
+            <Bi si="Camera එක අරඹන්න" en="Start camera" />
+          </button>
+        ) : (
+          message && (
+            <p className={`scanner__status scanner__status--${status}`} role="status">
+              <Bi stack si={message.si} en={message.en} />
+            </p>
+          )
+        )}
+        {result && (
+          <div className="scanner__result" role="status">
+            <small>
+              {result.object} · {result.confidence}%
+            </small>
+            <Bi as="strong" stack si={result.categorySi} en={result.category} />
+            {result.caution && (
+              <Bi
+                as="p"
+                stack
+                si="ද්‍රව්‍යය බලන්න: model එකට බෝතලය හඳුනාගත හැකි නමුත් ප්ලාස්ටික් ද වීදුරු ද කියා නිවැරදිව වෙන් කළ නොහැක."
+                en="Check the material: the model can see a bottle or cup, but cannot reliably tell plastic from glass."
+              />
+            )}
+          </div>
+        )}
+        {status === "error" && (
+          <button type="button" className="btn btn--secondary btn--block" onClick={startScanner}>
+            <Bi si="නැවත උත්සාහ කරන්න" en="Try again" />
+          </button>
+        )}
+        <Bi as="p" stack className="scanner__privacy" si="🔒 Camera දසුන ඔබේ browser එක තුළම පරීක්ෂා කරයි. පින්තූර upload කරන්නේ නැහැ." en="The camera is analysed in your browser. Images are never uploaded." />
+      </div>
+    </div>
+  );
 }

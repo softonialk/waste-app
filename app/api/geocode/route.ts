@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     url.searchParams.set("countrycodes", "lk");
     url.searchParams.set("limit", "1");
     const response = await fetch(url, {
-      headers: { Accept: "application/json", "Accept-Language": "en", "User-Agent": "EcoLoop-Waste-App/1.0 (+https://www.nextgen.mom)" },
+      headers: { Accept: "application/json", "Accept-Language": "en", "User-Agent": "NextGen-Waste-App/1.0 (+https://www.nextgen.mom)" },
       cache: "no-store",
     });
     if (!response.ok) throw new Error("Geocoding service failed");
