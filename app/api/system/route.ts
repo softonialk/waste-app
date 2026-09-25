@@ -56,9 +56,21 @@ type Collections = Awaited<ReturnType<typeof collections>>;
 const isDuplicateKey = (cause: unknown) => cause instanceof MongoServerError && cause.code === 11000;
 const COLLECTOR_FIELDS = { _id: 0, id: 1, name: 1, phone: 1, service_area: 1, organization: 1, verification_status: 1 } as const;
 
+// Optional secrets fall back to values derived from MONGODB_URI, which is already secret and always set.
+async function derivedSecret(purpose: string) {
+  return sha256(`${purpose}:${process.env.MONGODB_URI ?? ""}`);
+}
+
+// The admin portal stays disabled until ADMIN_PASSWORD is set; changing the password signs out existing sessions.
+async function adminSessionToken() {
+  if (!process.env.ADMIN_PASSWORD) return null;
+  return process.env.ADMIN_SESSION_TOKEN || derivedSecret(`admin-session:${process.env.ADMIN_PASSWORD}`);
+}
+
 async function isAdmin(request: Request) {
   const token = cookieValue(request, ADMIN_COOKIE);
-  return Boolean(process.env.ADMIN_SESSION_TOKEN && token) && await safeEqual(token, process.env.ADMIN_SESSION_TOKEN!);
+  const expected = await adminSessionToken();
+  return Boolean(expected && token) && await safeEqual(token, expected!);
 }
 
 async function collectorFromKey(db: Collections, field: "id" | "phone", value: string, key: string): Promise<Collector | null> {
@@ -80,8 +92,8 @@ async function householdOwner(request: Request) {
 }
 
 async function rateLimitKey(parts: string[]) {
-  if (!process.env.RATE_LIMIT_SALT) throw new Error("Rate limiting is not configured.");
-  return sha256(`${process.env.RATE_LIMIT_SALT}:${parts.join(":")}`);
+  const salt = process.env.RATE_LIMIT_SALT || await derivedSecret("rate-limit");
+  return sha256(`${salt}:${parts.join(":")}`);
 }
 
 async function countAttempt(db: Collections, key: string, action: string, expiresAt: Date) {
@@ -173,11 +185,12 @@ export async function POST(request: Request) {
     const db = await collections();
 
     if (body.action === "adminLogin") {
-      if (!process.env.ADMIN_PASSWORD || !process.env.ADMIN_SESSION_TOKEN) return error("Admin login is not configured.", 503);
+      const sessionToken = await adminSessionToken();
+      if (!process.env.ADMIN_PASSWORD || !sessionToken) return error("Admin login is not configured.", 503);
       const retryAfter = await consumeLimit(db, request, "admin-login", 15 * 60, 10);
       if (retryAfter) return rateLimited(retryAfter);
       if (!await safeEqual(text(body.password), process.env.ADMIN_PASSWORD)) return error("Incorrect admin password.", 401);
-      return Response.json(await viewState(request, { admin: true }), { headers: { "Set-Cookie": cookie(ADMIN_COOKIE, process.env.ADMIN_SESSION_TOKEN, 60 * 60 * 8) } });
+      return Response.json(await viewState(request, { admin: true }), { headers: { "Set-Cookie": cookie(ADMIN_COOKIE, sessionToken, 60 * 60 * 8) } });
     }
     if (body.action === "adminLogout") {
       return Response.json(await viewState(request, { admin: false }), { headers: { "Set-Cookie": cookie(ADMIN_COOKIE, "", 0) } });
