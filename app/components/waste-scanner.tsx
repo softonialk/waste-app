@@ -46,11 +46,11 @@ export function preloadWasteModel() {
 }
 
 const categoryByObject: Record<string, Omit<ScanResult, "object" | "confidence">> = {
-  banana: { category: "Organic Waste", categorySi: "කාබනික කසළ" }, apple: { category: "Organic Waste", categorySi: "කාබනික කසළ" }, orange: { category: "Organic Waste", categorySi: "කාබනික කසළ" }, broccoli: { category: "Organic Waste", categorySi: "කාබනික කසළ" }, carrot: { category: "Organic Waste", categorySi: "කාබනික කසළ" }, sandwich: { category: "Organic Waste", categorySi: "කාබනික කසළ" }, pizza: { category: "Organic Waste", categorySi: "කාබනික කසළ" }, donut: { category: "Organic Waste", categorySi: "කාබනික කසළ" }, cake: { category: "Organic Waste", categorySi: "කාබනික කසළ" },
+  banana: { category: "Organic", categorySi: "කාබනික කසළ" }, apple: { category: "Organic", categorySi: "කාබනික කසළ" }, orange: { category: "Organic", categorySi: "කාබනික කසළ" }, broccoli: { category: "Organic", categorySi: "කාබනික කසළ" }, carrot: { category: "Organic", categorySi: "කාබනික කසළ" }, sandwich: { category: "Organic", categorySi: "කාබනික කසළ" }, pizza: { category: "Organic", categorySi: "කාබනික කසළ" }, donut: { category: "Organic", categorySi: "කාබනික කසළ" }, cake: { category: "Organic", categorySi: "කාබනික කසළ" },
   "cell phone": { category: "E-Waste", categorySi: "ඉලෙක්ට්‍රොනික කසළ" }, laptop: { category: "E-Waste", categorySi: "ඉලෙක්ට්‍රොනික කසළ" }, keyboard: { category: "E-Waste", categorySi: "ඉලෙක්ට්‍රොනික කසළ" }, mouse: { category: "E-Waste", categorySi: "ඉලෙක්ට්‍රොනික කසළ" }, remote: { category: "E-Waste", categorySi: "ඉලෙක්ට්‍රොනික කසළ" }, tv: { category: "E-Waste", categorySi: "ඉලෙක්ට්‍රොනික කසළ" }, toaster: { category: "E-Waste", categorySi: "ඉලෙක්ට්‍රොනික කසළ" }, microwave: { category: "E-Waste", categorySi: "ඉලෙක්ට්‍රොනික කසළ" }, oven: { category: "E-Waste", categorySi: "ඉලෙක්ට්‍රොනික කසළ" }, refrigerator: { category: "E-Waste", categorySi: "ඉලෙක්ට්‍රොනික කසළ" },
   book: { category: "Paper & Cardboard", categorySi: "කඩදාසි සහ කාඩ්බෝඩ්" },
   scissors: { category: "Metal", categorySi: "ලෝහ" }, fork: { category: "Metal", categorySi: "ලෝහ" }, knife: { category: "Metal", categorySi: "ලෝහ" }, spoon: { category: "Metal", categorySi: "ලෝහ" },
-  bottle: { category: "Plastic / Glass", categorySi: "ප්ලාස්ටික් / වීදුරු", caution: true }, cup: { category: "Plastic / Glass", categorySi: "ප්ලාස්ටික් / වීදුරු", caution: true },
+  bottle: { category: "Plastic or Glass", categorySi: "ප්ලාස්ටික් හෝ වීදුරු", caution: true }, cup: { category: "Plastic or Glass", categorySi: "ප්ලාස්ටික් හෝ වීදුරු", caution: true },
 };
 
 export default function WasteScanner({ language, onClose }: Props) {
@@ -75,6 +75,16 @@ export default function WasteScanner({ language, onClose }: Props) {
     void preloadWasteModel().catch(() => undefined);
     return stopScanner;
   }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      stopScanner();
+      onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
 
   async function startScanner() {
     setStatus("loading");
