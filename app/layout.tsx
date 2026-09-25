@@ -1,27 +1,34 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import { LanguageProvider } from "./components/language";
 import "./globals.css";
+
+const description = "නොමිලේ ප්‍රතිචක්‍රීකරණ කසළ එකතු කිරීම · Free pickups of sorted recyclable waste across Sri Lanka.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.nextgen.mom"),
-  title: { default: "EcoLoop — Smart Waste Management", template: "%s · EcoLoop" },
-  description: "Request free pickups of sorted recyclable waste and find collection points across Sri Lanka.",
+  title: { default: "NextGen — කසළ කළමනාකරණය · Smart Waste Management", template: "%s · NextGen" },
+  description,
   openGraph: {
-    title: "EcoLoop — Smart Waste Management",
-    description: "Request free pickups of sorted recyclable waste and find collection points across Sri Lanka.",
+    title: "NextGen — Smart Waste Management",
+    description,
     url: "/",
-    siteName: "EcoLoop",
-    locale: "en_LK",
+    siteName: "NextGen",
+    locale: "si_LK",
+    alternateLocale: ["en_LK"],
     type: "website",
   },
 };
 
+export const viewport: Viewport = { themeColor: "#0b1512" };
+
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="si">
       <body>
-        <LanguageProvider>{children}</LanguageProvider>
+        <a className="skip-link" href="#main">
+          ප්‍රධාන අන්තර්ගතයට යන්න · Skip to content
+        </a>
+        {children}
       </body>
     </html>
   );

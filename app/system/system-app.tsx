@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState, type ReactNode } from "react";
 import { DISTRICTS, MAX_PICKUP_DAYS_AHEAD, REWARDS, WASTE_TYPES, addDays, colomboToday } from "../../lib/constants";
-import { LanguageToggle, useLanguage } from "../components/language";
+import { Bi, bi, type Message } from "../components/bi";
+import SiteFooter from "../components/site-footer";
+import SiteHeader from "../components/site-header";
 import { sinhalaMessages } from "./messages";
 
 export type Role = "household" | "collector" | "admin";
@@ -57,16 +59,15 @@ type Data = {
   admin: AdminState | null;
 };
 type ApiResponse = Data & { error?: string; accessKey?: string; reference?: string };
-type Act = (payload: Record<string, unknown>, success: string) => Promise<ApiResponse | null>;
-type T = (english: string, sinhala: string) => string;
+type Act = (payload: Record<string, unknown>, success: Message) => Promise<ApiResponse | null>;
 
 const emptyData: Data = { adminAuthenticated: false, adminEnabled: true, household: { requests: [] }, collector: null, admin: null };
 
-const statusLabels: Record<string, string> = {
+const statusSi: Record<string, string> = {
   Pending: "බලාපොරොත්තුවෙන්",
   Scheduled: "පවරා ඇත",
   "Awaiting Confirmation": "තහවුරු කිරීමට ඇත",
-  Disputed: "විවාදාත්මක",
+  Disputed: "ගැටලුවක් දන්වා ඇත",
   Completed: "සම්පූර්ණයි",
   Cancelled: "අවලංගුයි",
   "Verification Pending": "තහවුරු කිරීමට ඇත",
@@ -75,27 +76,41 @@ const statusLabels: Record<string, string> = {
   Requested: "ඉල්ලා ඇත",
   Delivered: "ලබා දුන්නා",
 };
-const statusClass = (status: string) => status.toLowerCase().replace(/\s+/g, "-");
+const ADMIN_STATUSES = ["Pending", "Scheduled", "Awaiting Confirmation", "Disputed", "Completed", "Cancelled"];
+const wasteSi = (value: string) => WASTE_TYPES.find((type) => type.value === value)?.si ?? value;
+const districtSi = (value?: string) => DISTRICTS.find((district) => district.value === value)?.si ?? value ?? "";
+const toMessage = (english: string): Message => ({ si: sinhalaMessages[english] ?? "දෝෂයක් සිදු විය.", en: english });
+const formPayload = (form: HTMLFormElement) => Object.fromEntries(new FormData(form));
 
 function validateNameInput(event: FormEvent<HTMLInputElement>) {
   const input = event.currentTarget;
   const value = input.value.trim();
   input.setCustomValidity(
-    !value || (/^[\p{L}\p{M}.' -]+$/u.test(value) && /\p{L}/u.test(value)) ? "" : "Use letters, spaces, apostrophes and full stops only.",
+    !value || (/^[\p{L}\p{M}.' -]+$/u.test(value) && /\p{L}/u.test(value))
+      ? ""
+      : bi("අකුරු, හිස්තැන්, ' සහ . පමණක් භාවිත කරන්න", "Use letters, spaces, apostrophes and full stops only"),
   );
 }
 
-const formPayload = (form: HTMLFormElement) => Object.fromEntries(new FormData(form));
+const phoneInputProps = {
+  name: "phone",
+  type: "tel",
+  inputMode: "tel",
+  required: true,
+  pattern: "(?:\\+?94|0)[\\s\\-]?7[0-9](?:[\\s\\-]?[0-9]){7}",
+  title: bi("ජංගම අංකයක්, උදා: 0771234567", "A mobile number, e.g. 0771234567"),
+  autoComplete: "tel",
+  placeholder: "0771234567",
+  className: "input",
+} as const;
 
 export default function SystemApp({ initialRole }: { initialRole: Role }) {
-  const { t, isSi } = useLanguage();
   const [role, setRole] = useState<Role>(initialRole);
   const [data, setData] = useState<Data>(emptyData);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-  const translateError = (text: string) => (isSi ? sinhalaMessages[text] ?? text : text);
+  const [message, setMessage] = useState<Message | null>(null);
+  const [error, setError] = useState<Message | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -109,7 +124,7 @@ export default function SystemApp({ initialRole }: { initialRole: Role }) {
         if (active) setData(json);
       })
       .catch((e) => {
-        if (active) setError(e instanceof Error && e.message ? e.message : "System data is temporarily unavailable.");
+        if (active) setError(toMessage(e instanceof Error && e.message ? e.message : "System data is temporarily unavailable."));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -121,8 +136,8 @@ export default function SystemApp({ initialRole }: { initialRole: Role }) {
 
   const act: Act = async (payload, success) => {
     setBusy(true);
-    setError("");
-    setMessage("");
+    setError(null);
+    setMessage(null);
     try {
       const response = await fetch("/api/system", {
         method: "POST",
@@ -135,7 +150,7 @@ export default function SystemApp({ initialRole }: { initialRole: Role }) {
       setMessage(success);
       return json;
     } catch (e) {
-      setError(e instanceof Error && e.message ? e.message : "The request could not be completed. Please try again.");
+      setError(toMessage(e instanceof Error && e.message ? e.message : "The request could not be completed. Please try again."));
       return null;
     } finally {
       setBusy(false);
@@ -144,101 +159,141 @@ export default function SystemApp({ initialRole }: { initialRole: Role }) {
 
   function selectRole(next: Role) {
     setRole(next);
-    setMessage("");
-    setError("");
+    setMessage(null);
+    setError(null);
     window.history.replaceState(null, "", `/system?role=${next}`);
   }
 
-  const roleLabels: Record<Role, string> = {
-    household: `🏠 ${t("Household", "නිවස")}`,
-    collector: `🚛 ${t("Collector", "එකතු කරන්නා")}`,
-    admin: `🛡️ ${t("Admin", "Admin")}`,
-  };
+  const tabs: { role: Role; icon: string; si: string; en: string }[] = [
+    { role: "household", icon: "🏠", si: "නිවස", en: "Household" },
+    { role: "collector", icon: "🚛", si: "එකතු කරන්නා", en: "Collector" },
+    { role: "admin", icon: "🛡️", si: "පරිපාලක", en: "Admin" },
+  ];
 
   return (
-    <main className="system-shell">
-      <header className="system-topbar">
-        <Link href="/" className="system-logo">
-          <span>↻</span>
-          <b>EcoLoop</b>
-        </Link>
-        <div>
-          <small>{t("PICKUP SYSTEM", "එකතු කිරීමේ පද්ධතිය")}</small>
-          <strong>{t("Smart Waste Collection", "බුද්ධිමත් කසළ එකතු කිරීම")}</strong>
-        </div>
-        <div className="system-topbar-actions">
-          <LanguageToggle />
-          <Link href="/">← {t("Home", "මුල් පිටුව")}</Link>
-        </div>
-      </header>
-      <section className="system-hero">
-        <div>
-          <h1>
-            {t("One request. One collector.", "එක් ඉල්ලීමක්. එක් එකතු කරන්නෙක්.")} <em>{t("A cleaner community.", "පිරිසිදු ප්‍රජාවක්.")}</em>
-          </h1>
-          <p>
-            {t(
-              "Households request a pickup for free. Verified collectors earn 100 coins once the household confirms the pickup.",
-              "නිවාස නොමිලේ එකතු කිරීමක් ඉල්ලයි. නිවස එකතු කිරීම තහවුරු කළ පසු තහවුරු කළ එකතු කරන්නාට coins 100ක් ලැබේ.",
+    <>
+      <SiteHeader />
+      <main id="main" className="portal">
+        <section className="portal-hero">
+          <div className="container">
+            <Bi as="p" className="eyebrow" si="එකතු කිරීමේ පද්ධතිය" en="Pickup system" />
+            <h1 className="portal-hero__title">
+              <Bi stack si="එක් ඉල්ලීමක්. එක් එකතු කරන්නෙක්." en="One request. One collector." />
+            </h1>
+            <ol className="flow">
+              <li>
+                <Bi si="ඉල්ලීම" en="Request" />
+              </li>
+              <li>
+                <Bi si="එකතු කිරීම" en="Collect" />
+              </li>
+              <li>
+                <Bi si="තහවුරු කිරීම" en="Confirm" />
+              </li>
+              <li>
+                <Bi si="Coins 100" en="100 coins" />
+              </li>
+            </ol>
+          </div>
+        </section>
+
+        <div className="container portal__body">
+          <nav className="role-tabs" aria-label={bi("පිටුවක් තෝරන්න", "Choose a portal")}>
+            {tabs.map((tab) => (
+              <button key={tab.role} type="button" className="role-tab" aria-pressed={role === tab.role} onClick={() => selectRole(tab.role)}>
+                <span aria-hidden="true">{tab.icon}</span>
+                <Bi stack si={tab.si} en={tab.en} />
+              </button>
+            ))}
+          </nav>
+
+          <div className="portal__alerts" aria-live="polite">
+            {error && (
+              <div className="alert alert--error" role="alert">
+                <Bi stack si={error.si} en={error.en} />
+              </div>
             )}
-          </p>
+            {message && (
+              <div className="alert alert--success" role="status">
+                <Bi stack si={message.si} en={message.en} />
+              </div>
+            )}
+          </div>
+
+          {loading ? (
+            <div className="skeleton" role="status">
+              <Bi si="දත්ත load වෙමින්..." en="Loading..." />
+            </div>
+          ) : role === "household" ? (
+            <Household requests={data.household.requests} busy={busy} act={act} />
+          ) : role === "collector" ? (
+            data.collector ? (
+              <CollectorView state={data.collector} busy={busy} act={act} />
+            ) : (
+              <CollectorAccess busy={busy} act={act} />
+            )
+          ) : data.admin ? (
+            <Admin admin={data.admin} busy={busy} act={act} />
+          ) : (
+            <AdminLogin enabled={data.adminEnabled} busy={busy} act={act} />
+          )}
         </div>
-        <div className="flow-mini">
-          <span>🏠 {t("Request", "ඉල්ලීම")}</span>
-          <b>→</b>
-          <span>🚛 {t("Collect", "එකතු කිරීම")}</span>
-          <b>→</b>
-          <span>✅ {t("Confirm", "තහවුරු කිරීම")}</span>
-        </div>
-      </section>
-      <nav className="role-tabs" aria-label={t("Choose a portal", "පිටුවක් තෝරන්න")}>
-        {(["household", "collector", "admin"] as Role[]).map((r) => (
-          <button key={r} type="button" className={role === r ? "active" : ""} aria-pressed={role === r} onClick={() => selectRole(r)}>
-            {roleLabels[r]}
-          </button>
-        ))}
-      </nav>
-      {(message || error) && (
-        <div className={error ? "system-alert error" : "system-alert"} role={error ? "alert" : "status"}>
-          {error ? translateError(error) : message}
-        </div>
-      )}
-      {loading && (
-        <div className="system-alert" role="status" aria-live="polite">
-          {t("Loading system data...", "දත්ත load වෙමින්...")}
-        </div>
-      )}
-      {!loading && role === "household" && <Household requests={data.household.requests} busy={busy} act={act} t={t} />}
-      {!loading &&
-        role === "collector" &&
-        (data.collector ? <CollectorView state={data.collector} busy={busy} act={act} t={t} /> : <CollectorAccess busy={busy} act={act} t={t} />)}
-      {!loading &&
-        role === "admin" &&
-        (data.admin ? <Admin admin={data.admin} busy={busy} act={act} t={t} /> : <AdminLogin enabled={data.adminEnabled} busy={busy} act={act} t={t} />)}
-    </main>
+      </main>
+      <SiteFooter />
+    </>
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const { isSi } = useLanguage();
-  return <span className={`status ${statusClass(status)}`}>{isSi ? statusLabels[status] ?? status : status}</span>;
+function Status({ status }: { status: string }) {
+  return (
+    <span className={`status status--${status.toLowerCase().replace(/\s+/g, "-")}`}>
+      <Bi si={statusSi[status] ?? status} en={status} />
+    </span>
+  );
 }
 
-function WasteLabel({ value }: { value: string }) {
-  const { isSi } = useLanguage();
-  return <>{isSi ? WASTE_TYPES.find((type) => type.value === value)?.si ?? value : value}</>;
+function Field({ si, en, children, hint }: { si: string; en: string; children: ReactNode; hint?: ReactNode }) {
+  return (
+    <label className="field">
+      <Bi className="field__label" si={si} en={en} />
+      {children}
+      {hint && <span className="field__hint">{hint}</span>}
+    </label>
+  );
 }
 
-function DistrictOptions({ placeholder }: { placeholder: string }) {
-  const { isSi } = useLanguage();
+function Panel({ si, en, children, className, actions }: { si: string; en: string; children: ReactNode; className?: string; actions?: ReactNode }) {
+  return (
+    <section className={`panel ${className ?? ""}`.trim()}>
+      <header className="panel__head">
+        <h2 className="panel__title">
+          <Bi stack si={si} en={en} />
+        </h2>
+        {actions}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+function Empty({ si, en }: { si: string; en: string }) {
+  return (
+    <div className="empty">
+      <span aria-hidden="true">♻</span>
+      <Bi as="p" stack si={si} en={en} />
+    </div>
+  );
+}
+
+function DistrictOptions() {
   return (
     <>
       <option value="" disabled>
-        {placeholder}
+        {bi("තෝරන්න", "Select")}
       </option>
       {DISTRICTS.map((district) => (
         <option key={district.value} value={district.value}>
-          {isSi ? district.si : district.value}
+          {bi(district.si, district.value)}
         </option>
       ))}
     </>
@@ -246,45 +301,59 @@ function DistrictOptions({ placeholder }: { placeholder: string }) {
 }
 
 function WasteOptions() {
-  const { isSi } = useLanguage();
   return (
     <>
       {WASTE_TYPES.map((type) => (
         <option key={type.value} value={type.value}>
-          {isSi ? type.si : type.value}
+          {bi(type.si, type.value)}
         </option>
       ))}
     </>
   );
 }
 
-function ConsentField({ t }: { t: T }) {
+function ConsentField() {
   return (
-    <label className="consent-field">
+    <label className="consent">
       <input type="checkbox" name="consent" required />
       <span>
-        {t("I agree that EcoLoop may use these details to arrange the pickup, as described in the ", "එකතු කිරීම සංවිධානය කිරීමට EcoLoop මෙම තොරතුරු භාවිත කිරීමට මම එකඟ වෙමි. ")}
-        <Link href="/privacy" target="_blank">
-          {t("privacy notice", "පෞද්ගලිකත්ව නිවේදනය")}
-        </Link>
-        .
+        <Bi
+          stack
+          si={
+            <>
+              එකතු කිරීම සංවිධානයට මෙම තොරතුරු භාවිත කිරීමට මම එකඟ වෙමි (<Link href="/privacy" target="_blank">පෞද්ගලිකත්ව නිවේදනය</Link>).
+            </>
+          }
+          en={
+            <>
+              I agree NextGen may use these details to arrange the pickup (<Link href="/privacy" target="_blank">privacy notice</Link>).
+            </>
+          }
+        />
       </span>
     </label>
   );
 }
 
-const phoneInputProps = {
-  name: "phone",
-  type: "tel",
-  inputMode: "tel",
-  required: true,
-  pattern: "(?:\\+?94|0)[\\s\\-]?7[0-9](?:[\\s\\-]?[0-9]){7}",
-  title: "Enter a mobile number, for example 0771234567.",
-  autoComplete: "tel",
-  placeholder: "0771234567",
-} as const;
+function Honeypot() {
+  return <input name="website" className="honeypot" tabIndex={-1} autoComplete="off" aria-hidden="true" />;
+}
 
-function Household({ requests, busy, act, t }: { requests: Pickup[]; busy: boolean; act: Act; t: T }) {
+function PortalIntro({ si, en, textSi, textEn, aside }: { si: string; en: string; textSi: string; textEn: string; aside?: ReactNode }) {
+  return (
+    <div className="portal-intro">
+      <div>
+        <h2 className="portal-intro__title">
+          <Bi stack si={si} en={en} />
+        </h2>
+        <Bi as="p" stack className="portal-intro__text" si={textSi} en={textEn} />
+      </div>
+      {aside}
+    </div>
+  );
+}
+
+function Household({ requests, busy, act }: { requests: Pickup[]; busy: boolean; act: Act }) {
   const minDate = colomboToday();
   const maxDate = addDays(minDate, MAX_PICKUP_DAYS_AHEAD);
   const [reference, setReference] = useState("");
@@ -292,7 +361,7 @@ function Household({ requests, busy, act, t }: { requests: Pickup[]; busy: boole
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
-    const json = await act({ action: "createRequest", ...formPayload(form) }, t("Pickup request submitted successfully.", "ඉල්ලීම සාර්ථකව යොමු කළා."));
+    const json = await act({ action: "createRequest", ...formPayload(form) }, { si: "ඉල්ලීම සාර්ථකව යොමු කළා.", en: "Pickup request submitted." });
     if (json) {
       form.reset();
       setReference(json.reference ?? "");
@@ -302,136 +371,144 @@ function Household({ requests, busy, act, t }: { requests: Pickup[]; busy: boole
   async function claim(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
-    if (await act({ action: "claimRequest", ...formPayload(form) }, t("Request added to this device.", "ඉල්ලීම මෙම උපාංගයට එක් කළා."))) form.reset();
+    if (await act({ action: "claimRequest", ...formPayload(form) }, { si: "ඉල්ලීම මෙම උපාංගයට එක් කළා.", en: "Request added to this device." })) form.reset();
   }
 
   return (
-    <section className="system-workspace">
-      <div className="system-intro">
-        <div>
-          <small>{t("HOUSEHOLD PORTAL", "නිවාස පිටුව")}</small>
-          <h2>{t("Request a waste pickup", "කසළ එකතු කිරීමක් ඉල්ලන්න")}</h2>
-          <p>{t("No fee. Schedule your sorted recyclable waste for collection.", "ගාස්තුවක් නැත. වෙන් කළ ප්‍රතිචක්‍රීකරණ කසළ එකතු කිරීමට වේලාවක් දෙන්න.")}</p>
-        </div>
-        <span>{t("Free request", "නොමිලේ")}</span>
-      </div>
+    <div className="workspace">
+      <PortalIntro
+        si="කසළ එකතු කිරීමක් ඉල්ලන්න"
+        en="Request a waste pickup"
+        textSi="ගාස්තුවක් නැත. වෙන් කළ ප්‍රතිචක්‍රීකරණ කසළ එකතු කිරීමට දිනයක් තෝරන්න."
+        textEn="No fee. Choose a day for your sorted recyclable waste to be collected."
+        aside={
+          <span className="tag">
+            <Bi si="නොමිලේ" en="Free" />
+          </span>
+        }
+      />
       {reference && (
-        <div className="system-alert reference-note" role="status">
-          {t("Your request reference is", "ඔබේ ඉල්ලීමේ අංකය")} <code>{reference}</code>.{" "}
-          {t(
-            "Keep it with your phone number to track this request on another device.",
-            "වෙනත් උපාංගයකින් මෙම ඉල්ලීම බැලීමට මෙය ඔබේ දුරකථන අංකය සමඟ තබා ගන්න.",
-          )}
+        <div className="alert alert--info" role="status">
+          <Bi
+            stack
+            si={
+              <>
+                ඔබේ ඉල්ලීමේ අංකය <code className="code">{reference}</code>. වෙනත් උපාංගයකින් බැලීමට මෙය දුරකථන අංකය සමඟ තබා ගන්න.
+              </>
+            }
+            en={
+              <>
+                Your reference is <code className="code">{reference}</code>. Keep it with your phone number to track this request on another device.
+              </>
+            }
+          />
         </div>
       )}
-      <div className="system-columns">
-        <form className="system-card system-form" onSubmit={submit}>
-          <h3>{t("Pickup details", "එකතු කිරීමේ තොරතුරු")}</h3>
-          <input name="website" className="honeypot" tabIndex={-1} autoComplete="off" aria-hidden="true" />
-          <label>
-            {t("Full name", "සම්පූර්ණ නම")}
-            <input name="householdName" required minLength={2} maxLength={60} onInput={validateNameInput} autoComplete="name" placeholder="e.g. Nimal Perera" />
-          </label>
-          <div className="form-pair">
-            <label>
-              {t("Phone", "දුරකථන අංකය")}
-              <input {...phoneInputProps} />
-            </label>
-            <label>
-              {t("Waste type", "කසළ වර්ගය")}
-              <select name="wasteType" required defaultValue="">
-                <option value="" disabled>
-                  {t("Select type", "වර්ගය තෝරන්න")}
-                </option>
-                <WasteOptions />
-              </select>
-            </label>
-          </div>
-          <div className="form-pair">
-            <label>
-              {t("District", "දිස්ත්‍රික්කය")}
-              <select name="district" required defaultValue="">
-                <DistrictOptions placeholder={t("Select district", "දිස්ත්‍රික්කය තෝරන්න")} />
-              </select>
-            </label>
-            <label>
-              {t("Estimated weight (kg)", "ඇස්තමේන්තු බර (kg)")}
-              <input name="quantity" type="number" inputMode="decimal" required min="0.1" max="1000" step="0.1" placeholder="e.g. 3.5" />
-            </label>
-          </div>
-          <label>
-            {t("Pickup address", "ලිපිනය")}
-            <textarea name="address" required minLength={8} maxLength={250} autoComplete="street-address" placeholder={t("House number, road, city", "නිවස අංකය, මාර්ගය, නගරය")} />
-          </label>
-          <div className="form-pair">
-            <label>
-              {t("Preferred date", "කැමති දිනය")}
-              <input name="pickupDate" type="date" min={minDate} max={maxDate} required />
-            </label>
-            <label>
-              {t("Preferred time", "කැමති වේලාව")}
-              <input name="pickupTime" type="time" required />
-            </label>
-          </div>
-          <label>
-            {t("Notes (optional)", "සටහන් (අවශ්‍ය නම්)")}
-            <input name="notes" maxLength={200} placeholder={t("Gate colour, landmark…", "ගේට්ටුවේ පාට, සලකුණක්…")} />
-          </label>
-          <ConsentField t={t} />
-          <button className="system-primary" disabled={busy}>
-            ♻ {t("Submit pickup request", "ඉල්ලීම යොමු කරන්න")}
-          </button>
-        </form>
-        <div className="system-stack">
-          <div className="system-card">
-            <h3>{t("My requests", "මගේ ඉල්ලීම්")}</h3>
-            {requests.length === 0 ? (
-              <Empty text={t("No pickup requests on this device yet.", "මෙම උපාංගයේ තවම ඉල්ලීම් නැත.")} />
-            ) : (
-              <div className="request-list">
-                {requests.map((r) => (
-                  <HouseholdRequest key={r.id} request={r} busy={busy} act={act} t={t} />
-                ))}
-              </div>
-            )}
-          </div>
-          <form className="system-card system-form compact" onSubmit={claim}>
-            <h3>{t("Track a request from another device", "වෙනත් උපාංගයකින් දැමූ ඉල්ලීමක් බලන්න")}</h3>
-            <div className="form-pair">
-              <label>
-                {t("Reference", "ඉල්ලීමේ අංකය")}
-                <input name="requestId" required pattern="[Rr][Ee][Qq]-[0-9A-Fa-f]{8}" placeholder="REQ-1A2B3C4D" />
-              </label>
-              <label>
-                {t("Phone", "දුරකථන අංකය")}
+      <div className="grid-2">
+        <Panel si="එකතු කිරීමේ තොරතුරු" en="Pickup details">
+          <form className="form" onSubmit={submit}>
+            <Honeypot />
+            <Field si="සම්පූර්ණ නම" en="Full name">
+              <input className="input" name="householdName" required minLength={2} maxLength={60} onInput={validateNameInput} autoComplete="name" placeholder="Nimal Perera" />
+            </Field>
+            <div className="form-row">
+              <Field si="දුරකථන අංකය" en="Phone">
                 <input {...phoneInputProps} />
-              </label>
+              </Field>
+              <Field si="දිස්ත්‍රික්කය" en="District">
+                <select className="input" name="district" required defaultValue="">
+                  <DistrictOptions />
+                </select>
+              </Field>
             </div>
-            <button className="system-secondary" disabled={busy}>
-              {t("Find my request", "ඉල්ලීම සොයන්න")}
+            <Field si="ලිපිනය" en="Pickup address">
+              <textarea className="input" name="address" required minLength={8} maxLength={250} autoComplete="street-address" placeholder={bi("නිවස අංකය, මාර්ගය, නගරය", "House number, road, town")} />
+            </Field>
+            <div className="form-row">
+              <Field si="කසළ වර්ගය" en="Waste type">
+                <select className="input" name="wasteType" required defaultValue="">
+                  <option value="" disabled>
+                    {bi("තෝරන්න", "Select")}
+                  </option>
+                  <WasteOptions />
+                </select>
+              </Field>
+              <Field si="ඇස්තමේන්තු බර (kg)" en="Estimated weight (kg)">
+                <input className="input" name="quantity" type="number" inputMode="decimal" required min="0.1" max="1000" step="0.1" placeholder="3.5" />
+              </Field>
+            </div>
+            <div className="form-row">
+              <Field si="කැමති දිනය" en="Preferred date">
+                <input className="input" name="pickupDate" type="date" min={minDate} max={maxDate} required />
+              </Field>
+              <Field si="කැමති වේලාව" en="Preferred time">
+                <input className="input" name="pickupTime" type="time" required />
+              </Field>
+            </div>
+            <Field si="සටහන් (අවශ්‍ය නම්)" en="Notes (optional)">
+              <input className="input" name="notes" maxLength={200} placeholder={bi("ගේට්ටුවේ පාට, සලකුණක්", "Gate colour, landmark")} />
+            </Field>
+            <ConsentField />
+            <button className="btn btn--primary btn--block btn--lg" disabled={busy}>
+              <Bi si="ඉල්ලීම යොමු කරන්න" en="Submit request" />
             </button>
           </form>
+        </Panel>
+
+        <div className="stack">
+          <Panel si="මගේ ඉල්ලීම්" en="My requests">
+            {requests.length === 0 ? (
+              <Empty si="මෙම උපාංගයේ තවම ඉල්ලීම් නැත." en="No requests on this device yet." />
+            ) : (
+              <ul className="list">
+                {requests.map((r) => (
+                  <HouseholdRequest key={r.id} request={r} busy={busy} act={act} />
+                ))}
+              </ul>
+            )}
+          </Panel>
+          <Panel si="වෙනත් උපාංගයකින් දැමූ ඉල්ලීමක්" en="Track a request from another device">
+            <form className="form" onSubmit={claim}>
+              <div className="form-row">
+                <Field si="ඉල්ලීමේ අංකය" en="Reference">
+                  <input className="input" name="requestId" required pattern="[Rr][Ee][Qq]-[0-9A-Fa-f]{8}" placeholder="REQ-1A2B3C4D" />
+                </Field>
+                <Field si="දුරකථන අංකය" en="Phone">
+                  <input {...phoneInputProps} />
+                </Field>
+              </div>
+              <button className="btn btn--secondary btn--block" disabled={busy}>
+                <Bi si="ඉල්ලීම සොයන්න" en="Find my request" />
+              </button>
+            </form>
+          </Panel>
         </div>
       </div>
-    </section>
+    </div>
   );
 }
 
-function HouseholdRequest({ request: r, busy, act, t }: { request: Pickup; busy: boolean; act: Act; t: T }) {
+function ItemHead({ si, en, status }: { si: string; en: string; status: string }) {
   return (
-    <article>
-      <div>
-        <b>
-          <WasteLabel value={r.waste_type} />
-        </b>
-        <StatusBadge status={r.status} />
-      </div>
-      <p>{r.address}</p>
-      <small>
-        {r.id} · {r.pickup_date} · {r.pickup_time} · {r.quantity}
-      </small>
+    <div className="item__head">
+      <h3 className="item__title">
+        <Bi si={si} en={en} />
+      </h3>
+      <Status status={status} />
+    </div>
+  );
+}
+
+function HouseholdRequest({ request: r, busy, act }: { request: Pickup; busy: boolean; act: Act }) {
+  return (
+    <li className="item">
+      <ItemHead si={wasteSi(r.waste_type)} en={r.waste_type} status={r.status} />
+      <p className="item__text">{r.address}</p>
+      <p className="item__meta">
+        <code className="code">{r.id}</code> · {r.pickup_date} · {r.pickup_time} · {r.quantity}
+      </p>
       {r.collector_name && r.status !== "Cancelled" && (
-        <small>
+        <p className="item__meta">
           🚛 {r.collector_name}
           {r.collector_phone && r.status === "Scheduled" && (
             <>
@@ -439,62 +516,74 @@ function HouseholdRequest({ request: r, busy, act, t }: { request: Pickup; busy:
               · <a href={`tel:${r.collector_phone}`}>{r.collector_phone}</a>
             </>
           )}
-        </small>
+        </p>
       )}
       {r.status === "Awaiting Confirmation" && (
-        <div className="confirm-box">
-          <p>
-            {t("The collector recorded", "එකතු කරන්නා සටහන් කළේ")} <b>{r.recorded_weight} kg</b>.{" "}
-            {t("Did this pickup happen?", "මෙම එකතු කිරීම සිදු වුණාද?")}
-          </p>
-          <div className="button-row">
-            <button disabled={busy} onClick={() => void act({ action: "confirmCompletion", requestId: r.id }, t("Thank you! Pickup confirmed.", "ස්තුතියි! එකතු කිරීම තහවුරු කළා."))}>
-              ✓ {t("Yes, confirm", "ඔව්, තහවුරු කරන්න")}
+        <div className="confirm">
+          <Bi
+            as="p"
+            stack
+            si={
+              <>
+                එකතු කරන්නා <b>{r.recorded_weight} kg</b> සටහන් කළා. මෙම එකතු කිරීම සිදු වුණාද?
+              </>
+            }
+            en={
+              <>
+                The collector recorded <b>{r.recorded_weight} kg</b>. Did this pickup happen?
+              </>
+            }
+          />
+          <div className="item__actions">
+            <button className="btn btn--primary btn--sm" disabled={busy} onClick={() => void act({ action: "confirmCompletion", requestId: r.id }, { si: "ස්තුතියි. එකතු කිරීම තහවුරු කළා.", en: "Thank you. Pickup confirmed." })}>
+              <Bi si="ඔව්, තහවුරුයි" en="Yes, confirm" />
             </button>
-            <button
-              className="danger"
-              disabled={busy}
-              onClick={() => void act({ action: "disputeCompletion", requestId: r.id }, t("Reported to the EcoLoop team.", "EcoLoop කණ්ඩායමට දැනුම් දුන්නා."))}
-            >
-              {t("No, report a problem", "නැහැ, ගැටලුවක් දන්වන්න")}
+            <button className="btn btn--danger btn--sm" disabled={busy} onClick={() => void act({ action: "disputeCompletion", requestId: r.id }, { si: "NextGen කණ්ඩායමට දැනුම් දුන්නා.", en: "Reported to the NextGen team." })}>
+              <Bi si="නැහැ, ගැටලුවක්" en="No, report a problem" />
             </button>
           </div>
         </div>
       )}
       {(r.status === "Pending" || r.status === "Scheduled") && (
-        <button
-          className="text-danger"
-          disabled={busy}
-          onClick={() => {
-            if (window.confirm(t("Cancel this pickup request?", "මෙම ඉල්ලීම අවලංගු කරන්නද?")))
-              void act({ action: "cancelRequest", requestId: r.id }, t("Pickup request cancelled.", "ඉල්ලීම අවලංගු කළා."));
-          }}
-        >
-          {t("Cancel request", "ඉල්ලීම අවලංගු කරන්න")}
-        </button>
+        <div className="item__actions">
+          <button
+            className="btn btn--link btn--danger-text"
+            disabled={busy}
+            onClick={() => {
+              if (window.confirm(bi("මෙම ඉල්ලීම අවලංගු කරන්නද?", "Cancel this pickup request?")))
+                void act({ action: "cancelRequest", requestId: r.id }, { si: "ඉල්ලීම අවලංගු කළා.", en: "Pickup request cancelled." });
+            }}
+          >
+            <Bi si="ඉල්ලීම අවලංගු කරන්න" en="Cancel request" />
+          </button>
+        </div>
       )}
-    </article>
+    </li>
   );
 }
 
-function AccessKeyNotice({ accessKey, t }: { accessKey: string; t: T }) {
+function AccessKeyNotice({ accessKey }: { accessKey: string }) {
   return accessKey ? (
-    <div className="system-alert" role="status">
-      {t("Collector access key:", "Access key එක:")} <code>{accessKey}</code> —{" "}
-      {t(
-        "save it now. It is needed with the phone number to sign in on another device and will not be shown again.",
-        "දැන්ම සුරකින්න. වෙනත් උපාංගයකින් පිවිසීමට දුරකථන අංකය සමඟ මෙය අවශ්‍යයි, නැවත පෙන්වන්නේ නැත.",
-      )}
+    <div className="alert alert--info" role="status">
+      <Bi
+        stack
+        si={
+          <>
+            Access key: <code className="code">{accessKey}</code> — දැන්ම සුරකින්න. වෙනත් උපාංගයකින් පිවිසීමට දුරකථන අංකය සමඟ මෙය අවශ්‍යයි; නැවත පෙන්වන්නේ නැත.
+          </>
+        }
+        en="Save it now. You need it with the phone number to sign in on another device, and it will not be shown again."
+      />
     </div>
   ) : null;
 }
 
-function CollectorAccess({ busy, act, t }: { busy: boolean; act: Act; t: T }) {
+function CollectorAccess({ busy, act }: { busy: boolean; act: Act }) {
   const [accessKey, setAccessKey] = useState("");
   async function register(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
-    const json = await act({ action: "registerCollector", ...formPayload(form) }, t("Registration sent for admin verification.", "ලියාපදිංචිය admin තහවුරු කිරීමට යොමු කළා."));
+    const json = await act({ action: "registerCollector", ...formPayload(form) }, { si: "ලියාපදිංචිය තහවුරු කිරීමට යොමු කළා.", en: "Registration sent for verification." });
     if (json) {
       form.reset();
       setAccessKey(json.accessKey || "");
@@ -502,73 +591,69 @@ function CollectorAccess({ busy, act, t }: { busy: boolean; act: Act; t: T }) {
   }
   function login(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    void act({ action: "collectorLogin", ...formPayload(e.currentTarget) }, t("Signed in as collector.", "එකතු කරන්නා ලෙස පිවිසුණා."));
+    void act({ action: "collectorLogin", ...formPayload(e.currentTarget) }, { si: "එකතු කරන්නා ලෙස පිවිසුණා.", en: "Signed in as collector." });
   }
   return (
-    <section className="system-workspace">
-      <AccessKeyNotice accessKey={accessKey} t={t} />
-      <div className="collector-head">
-        <div>
-          <small>{t("COLLECTOR PORTAL", "එකතු කරන්නාගේ පිටුව")}</small>
-          <h2>{t("Collection jobs & rewards", "එකතු කිරීම් සහ ත්‍යාග")}</h2>
-          <p>{t("Register once, then sign in with your phone number and access key.", "එක් වරක් ලියාපදිංචි වී, දුරකථන අංකය සහ access key එකෙන් පිවිසෙන්න.")}</p>
-        </div>
+    <div className="workspace">
+      <AccessKeyNotice accessKey={accessKey} />
+      <PortalIntro
+        si="එකතු කරන්නන්ගේ පිටුව"
+        en="Collector portal"
+        textSi="එක් වරක් ලියාපදිංචි වී, පසුව දුරකථන අංකය සහ access key එකෙන් පිවිසෙන්න."
+        textEn="Register once, then sign in with your phone number and access key."
+      />
+      <div className="grid-2">
+        <Panel si="අලුතින් ලියාපදිංචි වන්න" en="Register as a collector">
+          <form className="form" onSubmit={register}>
+            <Honeypot />
+            <Field si="නම" en="Name">
+              <input className="input" name="name" required minLength={2} maxLength={60} onInput={validateNameInput} autoComplete="name" />
+            </Field>
+            <Field si="දුරකථන අංකය" en="Phone">
+              <input {...phoneInputProps} />
+            </Field>
+            <div className="form-row">
+              <Field si="දිස්ත්‍රික්කය" en="District">
+                <select className="input" name="district" required defaultValue="">
+                  <DistrictOptions />
+                </select>
+              </Field>
+              <Field si="සේවා ප්‍රදේශය" en="Service area">
+                <input className="input" name="serviceArea" required minLength={2} maxLength={80} placeholder={bi("උදා: හලාවත", "e.g. Chilaw")} />
+              </Field>
+            </div>
+            <Field si="ආයතනය (අවශ්‍ය නම්)" en="Organization (optional)">
+              <input className="input" name="organization" maxLength={100} placeholder="Independent Collector" />
+            </Field>
+            <ConsentField />
+            <button className="btn btn--primary btn--block btn--lg" disabled={busy}>
+              <Bi si="තහවුරු කිරීමට යොමු කරන්න" en="Send for verification" />
+            </button>
+          </form>
+        </Panel>
+        <Panel si="පිවිසෙන්න" en="Sign in">
+          <form className="form" onSubmit={login}>
+            <Field si="දුරකථන අංකය" en="Phone">
+              <input {...phoneInputProps} />
+            </Field>
+            <Field
+              si="Access key"
+              en="Access key"
+              hint={<Bi stack si="Key එක නැති වුණාද? අලුත් එකක් සඳහා පරිපාලක අමතන්න." en="Lost your key? Ask an admin for a new one." />}
+            >
+              <input className="input" name="accessKey" type="password" required minLength={32} maxLength={40} autoComplete="current-password" />
+            </Field>
+            <button className="btn btn--secondary btn--block btn--lg" disabled={busy}>
+              <Bi si="පිවිසෙන්න" en="Sign in" />
+            </button>
+          </form>
+        </Panel>
       </div>
-      <div className="system-columns">
-        <form className="system-card system-form compact" onSubmit={register}>
-          <h3>{t("Register as a collector", "එකතු කරන්නෙකු ලෙස ලියාපදිංචි වන්න")}</h3>
-          <input name="website" className="honeypot" tabIndex={-1} autoComplete="off" aria-hidden="true" />
-          <label>
-            {t("Name", "නම")}
-            <input name="name" required minLength={2} maxLength={60} onInput={validateNameInput} autoComplete="name" />
-          </label>
-          <label>
-            {t("Phone", "දුරකථන අංකය")}
-            <input {...phoneInputProps} />
-          </label>
-          <div className="form-pair">
-            <label>
-              {t("District", "දිස්ත්‍රික්කය")}
-              <select name="district" required defaultValue="">
-                <DistrictOptions placeholder={t("Select district", "දිස්ත්‍රික්කය තෝරන්න")} />
-              </select>
-            </label>
-            <label>
-              {t("Service area", "සේවා ප්‍රදේශය")}
-              <input name="serviceArea" required minLength={2} maxLength={80} placeholder="e.g. Chilaw" />
-            </label>
-          </div>
-          <label>
-            {t("Organization (optional)", "ආයතනය (අවශ්‍ය නම්)")}
-            <input name="organization" maxLength={100} placeholder="Independent Collector" />
-          </label>
-          <ConsentField t={t} />
-          <button className="system-primary" disabled={busy}>
-            {t("Send for verification", "තහවුරු කිරීමට යොමු කරන්න")}
-          </button>
-        </form>
-        <form className="system-card system-form compact" onSubmit={login}>
-          <h3>{t("Collector sign in", "එකතු කරන්නා පිවිසුම")}</h3>
-          <label>
-            {t("Phone", "දුරකථන අංකය")}
-            <input {...phoneInputProps} />
-          </label>
-          <label>
-            Access key
-            <input name="accessKey" type="password" required minLength={32} maxLength={40} autoComplete="current-password" />
-          </label>
-          <small className="form-help">{t("Lost your key? Ask an EcoLoop admin to issue a new one.", "Key එක නැති වුණාද? අලුත් එකක් ලබා ගැනීමට admin අමතන්න.")}</small>
-          <button className="system-primary" disabled={busy}>
-            {t("Sign in", "පිවිසෙන්න")}
-          </button>
-        </form>
-      </div>
-    </section>
+    </div>
   );
 }
 
-function CollectorView({ state, busy, act, t }: { state: CollectorState; busy: boolean; act: Act; t: T }) {
-  const { isSi } = useLanguage();
+function CollectorView({ state, busy, act }: { state: CollectorState; busy: boolean; act: Act }) {
   const { profile, openJobs, jobs, redemptions, earned, balance } = state;
   const verified = profile.verification_status === "Verified";
   const suspended = profile.verification_status === "Suspended";
@@ -579,232 +664,237 @@ function CollectorView({ state, busy, act, t }: { state: CollectorState; busy: b
   const completed = jobs.filter((r) => r.status === "Completed");
 
   return (
-    <section className="system-workspace">
-      <div className="collector-head">
+    <div className="workspace">
+      <div className="profile-bar">
         <div>
-          <small>{t("COLLECTOR PORTAL", "එකතු කරන්නාගේ පිටුව")}</small>
-          <h2>{t("Collection jobs & rewards", "එකතු කිරීම් සහ ත්‍යාග")}</h2>
-          <p>{t("100 coins are credited when the household confirms a completed pickup.", "නිවස එකතු කිරීම තහවුරු කළ විට coins 100ක් ලැබේ.")}</p>
+          <p className="profile-bar__name">{profile.name}</p>
+          <p className="profile-bar__meta">
+            {profile.service_area}
+            {profile.district ? `, ${districtSi(profile.district)} · ${profile.district}` : ""} · {profile.phone}
+          </p>
         </div>
+        <Status status={profile.verification_status} />
         <div className="coin-card">
-          <small>{t("AVAILABLE BALANCE", "ඇති ශේෂය")}</small>
-          <strong>🪙 {balance}</strong>
-          <span>{t("Collector coins", "Collector coins")}</span>
+          <Bi stack className="coin-card__label" si="ඇති ශේෂය" en="Balance" />
+          <strong className="coin-card__value">
+            {balance.toLocaleString("en-LK")} <small>coins</small>
+          </strong>
         </div>
-      </div>
-      <div className="collector-select">
-        <div>
-          <b>{profile.name}</b> · {profile.service_area}
-          {profile.district ? `, ${profile.district}` : ""} · {profile.phone}
-        </div>
-        <StatusBadge status={profile.verification_status} />
-        <button type="button" className="admin-logout" disabled={busy} onClick={() => void act({ action: "collectorLogout" }, t("Signed out.", "පිටව ගියා."))}>
-          {t("Log out", "පිටවන්න")}
+        <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={() => void act({ action: "collectorLogout" }, { si: "පිටව ගියා.", en: "Signed out." })}>
+          <Bi si="පිටවන්න" en="Log out" />
         </button>
       </div>
+
       {suspended && (
-        <div className="system-alert error" role="alert">
-          {t("Your collector account is suspended. Contact an EcoLoop admin.", "ඔබේ ගිණුම අත්හිටුවා ඇත. EcoLoop admin අමතන්න.")}
+        <div className="alert alert--error" role="alert">
+          <Bi stack si="ඔබේ ගිණුම අත්හිටුවා ඇත. NextGen පරිපාලක අමතන්න." en="Your collector account is suspended. Contact a NextGen admin." />
         </div>
       )}
-      <div className="system-card wide">
-        <div className="card-head">
-          <h3>{t("Available pickup requests", "ලබාගත හැකි ඉල්ලීම්")}</h3>
-          {verified && (
-            <label className="inline-filter">
-              {t("District", "දිස්ත්‍රික්කය")}
-              <select value={district} onChange={(e) => setDistrict(e.target.value)}>
-                <option value="all">{t("All districts", "සියලු දිස්ත්‍රික්ක")}</option>
+      {!verified && !suspended && (
+        <div className="alert alert--info" role="status">
+          <Bi stack si="ඔබේ ලියාපදිංචිය පරිපාලක තහවුරු කරන තුරු ඉල්ලීම් භාරගත නොහැක." en="You can take jobs once an admin verifies your registration." />
+        </div>
+      )}
+
+      <Panel
+        si="ලබාගත හැකි ඉල්ලීම්"
+        en="Available pickups"
+        actions={
+          verified && (
+            <label className="inline-field">
+              <Bi className="field__label" si="දිස්ත්‍රික්කය" en="District" />
+              <select className="input input--sm" value={district} onChange={(e) => setDistrict(e.target.value)}>
+                <option value="all">{bi("සියලු දිස්ත්‍රික්ක", "All districts")}</option>
                 {DISTRICTS.map((d) => (
                   <option key={d.value} value={d.value}>
-                    {isSi ? d.si : d.value}
+                    {bi(d.si, d.value)}
                   </option>
                 ))}
               </select>
             </label>
-          )}
-        </div>
+          )
+        }
+      >
         {!verified ? (
-          <Empty text={suspended ? t("Suspended accounts cannot take jobs.", "අත්හිටුවූ ගිණුම්වලට ඉල්ලීම් ගත නොහැක.") : t("Open pickups appear once an admin verifies your profile.", "Admin ඔබව තහවුරු කළ පසු ඉල්ලීම් පෙන්වයි.")} />
+          <Empty si="තහවුරු කළ පසු ඉල්ලීම් මෙහි පෙන්වයි." en="Pickups appear here once you are verified." />
         ) : visibleJobs.length === 0 ? (
-          <Empty text={t("No open pickup requests here right now.", "දැනට මෙහි ඉල්ලීම් නැත.")} />
+          <Empty si="දැනට මෙහි ඉල්ලීම් නැත." en="No open pickups here right now." />
         ) : (
-          <div className="job-list job-grid">
+          <ul className="list list--grid">
             {visibleJobs.map((r) => (
-              <article key={r.id}>
-                <div>
-                  <b>
-                    <WasteLabel value={r.waste_type} />
-                  </b>
-                  <StatusBadge status={r.status} />
-                </div>
-                <p>
+              <li className="item" key={r.id}>
+                <ItemHead si={wasteSi(r.waste_type)} en={r.waste_type} status={r.status} />
+                <p className="item__text">
                   📍 {r.address}
-                  {r.district ? `, ${r.district}` : ""}
+                  {r.district ? ` · ${districtSi(r.district)}` : ""}
                 </p>
-                <small>
+                <p className="item__meta">
                   {r.pickup_date} · {r.pickup_time} · {r.quantity}
-                </small>
-                <button disabled={busy} onClick={() => void act({ action: "acceptRequest", requestId: r.id }, t("Pickup accepted.", "ඉල්ලීම භාරගත්තා."))}>
-                  {t("Accept job", "භාරගන්න")}
-                </button>
-              </article>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="system-card wide">
-        <h3>{t("My scheduled collections", "මට පැවරූ එකතු කිරීම්")}</h3>
-        {assigned.length === 0 ? (
-          <Empty text={t("Accepted jobs will appear here.", "භාරගත් ඉල්ලීම් මෙහි පෙන්වයි.")} />
-        ) : (
-          <div className="job-list job-grid">
-            {assigned.map((r) => (
-              <article key={r.id}>
-                <div>
-                  <b>{r.household_name}</b>
-                  <StatusBadge status={r.status} />
-                </div>
-                <p>
-                  {r.address}
-                  {r.district ? `, ${r.district}` : ""}
                 </p>
-                <small>
+                <div className="item__actions">
+                  <button className="btn btn--primary btn--sm" disabled={busy} onClick={() => void act({ action: "acceptRequest", requestId: r.id }, { si: "ඉල්ලීම භාරගත්තා.", en: "Pickup accepted." })}>
+                    <Bi si="භාරගන්න" en="Accept" />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
+      <Panel si="මට පැවරූ එකතු කිරීම්" en="My scheduled pickups">
+        {assigned.length === 0 ? (
+          <Empty si="භාරගත් ඉල්ලීම් මෙහි පෙන්වයි." en="Accepted jobs appear here." />
+        ) : (
+          <ul className="list list--grid">
+            {assigned.map((r) => (
+              <li className="item" key={r.id}>
+                <div className="item__head">
+                  <h3 className="item__title">{r.household_name}</h3>
+                  <Status status={r.status} />
+                </div>
+                <p className="item__text">
+                  {r.address}
+                  {r.district ? ` · ${districtSi(r.district)}` : ""}
+                </p>
+                <p className="item__meta">
                   {r.pickup_date} · {r.pickup_time} · 📞 <a href={`tel:${r.phone}`}>{r.phone}</a>
                   {r.notes ? ` · ${r.notes}` : ""}
-                </small>
-                <CompleteForm request={r} busy={busy} act={act} t={t} />
+                </p>
+                <CompleteForm request={r} busy={busy} act={act} />
                 <button
-                  className="text-danger"
+                  className="btn btn--link btn--danger-text"
                   disabled={busy}
-                  onClick={() => void act({ action: "releaseRequest", requestId: r.id }, t("Job released for other collectors.", "ඉල්ලීම වෙනත් අයට නිදහස් කළා."))}
+                  onClick={() => void act({ action: "releaseRequest", requestId: r.id }, { si: "ඉල්ලීම වෙනත් අයට නිදහස් කළා.", en: "Job released to other collectors." })}
                 >
-                  {t("I can't do this job — release it", "මට මෙය කළ නොහැක — නිදහස් කරන්න")}
+                  <Bi si="මට යා නොහැක — නිදහස් කරන්න" en="I can't go — release it" />
                 </button>
-              </article>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
-      </div>
+      </Panel>
+
       {waiting.length > 0 && (
-        <div className="system-card wide">
-          <h3>{t("Waiting for household confirmation", "නිවසේ තහවුරු කිරීම බලාපොරොත්තුවෙන්")}</h3>
-          <div className="job-list job-grid">
+        <Panel si="නිවසේ තහවුරු කිරීම බලාපොරොත්තුවෙන්" en="Waiting for household confirmation">
+          <ul className="list list--grid">
             {waiting.map((r) => (
-              <article key={r.id}>
-                <div>
-                  <b>{r.household_name}</b>
-                  <StatusBadge status={r.status} />
+              <li className="item" key={r.id}>
+                <div className="item__head">
+                  <h3 className="item__title">{r.household_name}</h3>
+                  <Status status={r.status} />
                 </div>
-                <p>{r.address}</p>
-                <small>
-                  {r.recorded_weight} kg · <WasteLabel value={r.waste_type} />
-                </small>
-              </article>
+                <p className="item__text">{r.address}</p>
+                <p className="item__meta">
+                  {r.recorded_weight} kg · {bi(wasteSi(r.waste_type), r.waste_type)}
+                </p>
+              </li>
             ))}
-          </div>
-        </div>
+          </ul>
+        </Panel>
       )}
-      <div className="rewards-system">
-        <div>
-          <p className="kicker">{t("COLLECTOR REWARDS", "එකතු කරන්නන්ගේ ත්‍යාග")}</p>
-          <h2>{t("Redeem your coins", "Coins මුදාගන්න")}</h2>
-          <p>{t("The EcoLoop team delivers each reward after you redeem it.", "ඔබ මුදාගත් පසු EcoLoop කණ්ඩායම ත්‍යාගය ලබා දෙයි.")}</p>
-        </div>
-        <div className="system-reward-grid">
+
+      <Panel si="Coins මුදාගන්න" en="Redeem your coins" className="panel--rewards">
+        <Bi as="p" stack className="panel__lead" si="ඔබ මුදාගත් පසු NextGen කණ්ඩායම ත්‍යාගය ලබා දෙයි." en="The NextGen team delivers each reward after you redeem it." />
+        <ul className="reward-grid">
           {REWARDS.map((r) => (
-            <article key={r.name}>
-              <span>{r.icon}</span>
-              <h3>{isSi ? r.si : r.name}</h3>
-              <strong>{r.points} coins</strong>
+            <li className="reward-card" key={r.name}>
+              <span className="reward-card__icon" aria-hidden="true">
+                {r.icon}
+              </span>
+              <Bi as="h3" stack className="reward-card__title" si={r.si} en={r.name} />
+              <p className="reward-card__points">
+                {r.points.toLocaleString("en-LK")} <small>coins</small>
+              </p>
               <button
+                className="btn btn--primary btn--block btn--sm"
                 disabled={busy || !verified || balance < r.points}
-                onClick={() => void act({ action: "redeem", rewardName: r.name }, t(`${r.name} redeemed. We will contact you to deliver it.`, `${r.si} මුදාගත්තා. ලබා දීමට අපි ඔබව අමතන්නෙමු.`))}
+                onClick={() => void act({ action: "redeem", rewardName: r.name }, { si: `${r.si} මුදාගත්තා. ලබා දීමට අපි ඔබව අමතමු.`, en: `${r.name} redeemed. We will contact you to deliver it.` })}
               >
-                {balance >= r.points ? t("Redeem", "මුදාගන්න") : t("More coins needed", "තවත් coins අවශ්‍යයි")}
+                {balance >= r.points ? <Bi si="මුදාගන්න" en="Redeem" /> : <Bi si="තවත් coins අවශ්‍යයි" en="More coins needed" />}
               </button>
-            </article>
+            </li>
           ))}
-        </div>
+        </ul>
         {completed.length > 0 && (
-          <p className="completion-note">
-            ✓ {completed.length} {t("confirmed collections", "තහවුරු කළ එකතු කිරීම්")} · {earned} {t("coins earned in total", "coins මුළු ඉපයීම")}
+          <p className="panel__note">
+            <Bi si={`තහවුරු කළ එකතු කිරීම් ${completed.length} · මුළු ඉපයීම coins ${earned}`} en={`${completed.length} confirmed pickups · ${earned} coins earned`} />
           </p>
         )}
         {redemptions.length > 0 && (
-          <div className="redemption-list">
-            <h3>{t("My redemptions", "මගේ මුදාගැනීම්")}</h3>
-            {redemptions.map((r) => (
-              <div key={r.id}>
-                <span>
-                  {r.reward_name} · <code>{r.reference}</code>
-                </span>
-                <StatusBadge status={r.status ?? "Requested"} />
-              </div>
-            ))}
-          </div>
+          <>
+            <h3 className="panel__subtitle">
+              <Bi si="මගේ මුදාගැනීම්" en="My redemptions" />
+            </h3>
+            <ul className="rows">
+              {redemptions.map((r) => (
+                <li key={r.id}>
+                  <span>
+                    {r.reward_name} · <code className="code">{r.reference}</code>
+                  </span>
+                  <Status status={r.status ?? "Requested"} />
+                </li>
+              ))}
+            </ul>
+          </>
         )}
-      </div>
-    </section>
+      </Panel>
+    </div>
   );
 }
 
-function CompleteForm({ request, busy, act, t }: { request: Pickup; busy: boolean; act: Act; t: T }) {
+function CompleteForm({ request, busy, act }: { request: Pickup; busy: boolean; act: Act }) {
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     void act(
       { action: "completeRequest", requestId: request.id, ...formPayload(e.currentTarget) },
-      t("Marked as collected. Coins are added when the household confirms.", "එකතු කළ බව සටහන් කළා. නිවස තහවුරු කළ විට coins එකතු වේ."),
+      { si: "එකතු කළ බව සටහන් කළා. නිවස තහවුරු කළ විට coins එකතු වේ.", en: "Marked as collected. Coins are added when the household confirms." },
     );
   }
   return (
     <form className="complete-form" onSubmit={submit}>
-      <select name="wasteType" defaultValue={request.waste_type} aria-label={t("Waste type", "කසළ වර්ගය")}>
+      <select className="input input--sm" name="wasteType" defaultValue={request.waste_type} aria-label={bi("කසළ වර්ගය", "Waste type")}>
         <WasteOptions />
       </select>
-      <input name="weight" type="number" min="0.1" max="1000" step="0.1" required placeholder={t("Weight (kg)", "බර (kg)")} />
-      <button disabled={busy}>{t("Mark collected", "එකතු කළා")}</button>
+      <input className="input input--sm" name="weight" type="number" min="0.1" max="1000" step="0.1" required placeholder={bi("බර kg", "Weight kg")} aria-label={bi("බර kg", "Weight kg")} />
+      <button className="btn btn--primary btn--sm" disabled={busy}>
+        <Bi si="එකතු කළා" en="Collected" />
+      </button>
     </form>
   );
 }
 
-function AdminLogin({ enabled, busy, act, t }: { enabled: boolean; busy: boolean; act: Act; t: T }) {
+function AdminLogin({ enabled, busy, act }: { enabled: boolean; busy: boolean; act: Act }) {
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    void act({ action: "adminLogin", ...formPayload(e.currentTarget) }, t("Admin login successful.", "Admin ලෙස පිවිසුණා."));
+    void act({ action: "adminLogin", ...formPayload(e.currentTarget) }, { si: "පරිපාලක ලෙස පිවිසුණා.", en: "Signed in as admin." });
   }
   return (
-    <section className="system-workspace admin-login-wrap">
-      <form className="system-card system-form admin-login" onSubmit={submit}>
-        <span className="admin-lock">🔐</span>
-        <small>{t("PROTECTED ADMIN PORTAL", "ආරක්ෂිත ADMIN පිටුව")}</small>
-        <h2>{t("Admin login", "Admin පිවිසුම")}</h2>
-        {enabled ? (
-          <p>{t("Enter the administrator password to manage collectors, pickups and rewards.", "එකතු කරන්නන්, ඉල්ලීම් සහ ත්‍යාග කළමනාකරණයට admin මුරපදය ඇතුළත් කරන්න.")}</p>
-        ) : (
-          <p className="form-help">
-            {t(
-              "The admin portal is not set up yet. Add ADMIN_PASSWORD to the server's environment variables and redeploy.",
-              "Admin පිටුව තවම සකසා නැත. Server environment variables වලට ADMIN_PASSWORD එකතු කර නැවත deploy කරන්න.",
-            )}
-          </p>
-        )}
-        <label>
-          {t("Password", "මුරපදය")}
-          <input name="password" type="password" required autoComplete="current-password" disabled={!enabled} />
-        </label>
-        <button className="system-primary" disabled={busy || !enabled}>
-          {busy ? t("Signing in…", "පිවිසෙමින්…") : t("Sign in securely", "ආරක්ෂිතව පිවිසෙන්න")}
-        </button>
-      </form>
-    </section>
+    <div className="workspace workspace--narrow">
+      <Panel si="පරිපාලක පිවිසුම" en="Admin sign in">
+        <form className="form" onSubmit={submit}>
+          {enabled ? (
+            <Bi as="p" stack className="panel__lead" si="එකතු කරන්නන්, ඉල්ලීම් සහ ත්‍යාග කළමනාකරණයට මුරපදය ඇතුළත් කරන්න." en="Enter the password to manage collectors, pickups and rewards." />
+          ) : (
+            <div className="alert alert--info">
+              <Bi stack si="පරිපාලක පිටුව තවම සකසා නැත. Vercel environment variables වලට ADMIN_PASSWORD එකතු කර නැවත deploy කරන්න." en="The admin portal is not set up yet. Add ADMIN_PASSWORD to the Vercel environment variables and redeploy." />
+            </div>
+          )}
+          <Field si="මුරපදය" en="Password">
+            <input className="input" name="password" type="password" required autoComplete="current-password" disabled={!enabled} />
+          </Field>
+          <button className="btn btn--primary btn--block btn--lg" disabled={busy || !enabled}>
+            {busy ? <Bi si="පිවිසෙමින්..." en="Signing in..." /> : <Bi si="පිවිසෙන්න" en="Sign in" />}
+          </button>
+        </form>
+      </Panel>
+    </div>
   );
 }
 
 const PAGE_SIZE = 20;
 
-function Admin({ admin, busy, act, t }: { admin: AdminState; busy: boolean; act: Act; t: T }) {
-  const { isSi } = useLanguage();
+function Admin({ admin, busy, act }: { admin: AdminState; busy: boolean; act: Act }) {
   const [accessKey, setAccessKey] = useState("");
   const [status, setStatus] = useState("open");
   const [district, setDistrict] = useState("all");
@@ -816,9 +906,7 @@ function Admin({ admin, busy, act, t }: { admin: AdminState; busy: boolean; act:
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
     return admin.requests.filter((r) => {
-      const matchesStatus =
-        status === "all" ||
-        (status === "open" ? ["Pending", "Scheduled", "Awaiting Confirmation", "Disputed"].includes(r.status) : r.status === status);
+      const matchesStatus = status === "all" || (status === "open" ? ["Pending", "Scheduled", "Awaiting Confirmation", "Disputed"].includes(r.status) : r.status === status);
       const matchesDistrict = district === "all" || r.district === district;
       const haystack = `${r.id} ${r.household_name} ${r.phone} ${r.address} ${r.collector_name ?? ""}`.toLowerCase();
       return matchesStatus && matchesDistrict && (!query || haystack.includes(query));
@@ -827,249 +915,238 @@ function Admin({ admin, busy, act, t }: { admin: AdminState; busy: boolean; act:
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
   const pageItems = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+  const count = (key: string) => admin.counts[key] ?? 0;
+  const resetPage = () => setPage(0);
 
   async function issueKey(c: Collector) {
-    const json = await act({ action: "issueCollectorKey", collectorId: c.id }, t(`New access key issued for ${c.name}. Share it privately.`, `${c.name} සඳහා අලුත් key එකක් නිකුත් කළා. පෞද්ගලිකව ලබා දෙන්න.`));
+    const json = await act({ action: "issueCollectorKey", collectorId: c.id }, { si: `${c.name} සඳහා අලුත් key එකක්. පෞද්ගලිකව ලබා දෙන්න.`, en: `New access key for ${c.name}. Share it privately.` });
     if (json) setAccessKey(json.accessKey || "");
   }
 
-  const count = (key: string) => admin.counts[key] ?? 0;
+  const metrics = [
+    { si: "බලාපොරොත්තුවෙන්", en: "Pending", value: count("Pending") },
+    { si: "පවරා ඇත", en: "Scheduled", value: count("Scheduled") },
+    { si: "සමාලෝචනයට", en: "To review", value: count("Awaiting Confirmation") + count("Disputed") },
+    { si: "සම්පූර්ණයි", en: "Completed", value: count("Completed") },
+  ];
 
   return (
-    <section className="system-workspace">
-      <AccessKeyNotice accessKey={accessKey} t={t} />
-      <div className="system-intro">
+    <div className="workspace">
+      <AccessKeyNotice accessKey={accessKey} />
+      <div className="portal-intro">
         <div>
-          <small>{t("ADMIN PORTAL", "ADMIN පිටුව")}</small>
-          <h2>{t("Verify and monitor operations", "තහවුරු කිරීම සහ අධීක්ෂණය")}</h2>
-          <p>{t("Approve collectors, resolve disputes and deliver rewards.", "එකතු කරන්නන් අනුමත කරන්න, ගැටලු විසඳන්න, ත්‍යාග ලබා දෙන්න.")}</p>
+          <h2 className="portal-intro__title">
+            <Bi stack si="පරිපාලනය" en="Admin" />
+          </h2>
+          <Bi as="p" stack className="portal-intro__text" si="එකතු කරන්නන් අනුමත කරන්න, ගැටලු විසඳන්න, ත්‍යාග ලබා දෙන්න." en="Approve collectors, resolve disputes and deliver rewards." />
         </div>
-        <div className="admin-tools">
-          <div className="admin-metrics">
-            <span>
-              <b>{count("Pending")}</b> {t("pending", "බලාපොරොත්තුවෙන්")}
-            </span>
-            <span>
-              <b>{count("Scheduled")}</b> {t("scheduled", "පවරා ඇත")}
-            </span>
-            <span>
-              <b>{count("Awaiting Confirmation") + count("Disputed")}</b> {t("to review", "සමාලෝචනයට")}
-            </span>
-            <span>
-              <b>{count("Completed")}</b> {t("completed", "සම්පූර්ණයි")}
-            </span>
-          </div>
-          <button type="button" className="admin-logout" disabled={busy} onClick={() => void act({ action: "adminLogout" }, t("Admin logged out.", "Admin පිටව ගියා."))}>
-            {t("Log out", "පිටවන්න")}
-          </button>
-        </div>
+        <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={() => void act({ action: "adminLogout" }, { si: "පිටව ගියා.", en: "Signed out." })}>
+          <Bi si="පිටවන්න" en="Log out" />
+        </button>
       </div>
 
-      <div className="system-columns">
-        <div className="system-card">
-          <h3>{t("Collectors waiting for verification", "තහවුරු කිරීමට ඇති එකතු කරන්නන්")}</h3>
+      <dl className="metrics">
+        {metrics.map((metric) => (
+          <div className="metric" key={metric.en}>
+            <dt>
+              <Bi stack si={metric.si} en={metric.en} />
+            </dt>
+            <dd>{metric.value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <div className="grid-2">
+        <Panel si="තහවුරු කිරීමට ඇති එකතු කරන්නන්" en="Collectors to verify">
           {pendingCollectors.length === 0 ? (
-            <Empty text={t("No collectors are waiting for verification.", "තහවුරු කිරීමට කිසිවෙක් නැත.")} />
+            <Empty si="තහවුරු කිරීමට කිසිවෙක් නැත." en="Nobody is waiting." />
           ) : (
-            <div className="job-list">
+            <ul className="list">
               {pendingCollectors.map((c) => (
-                <article key={c.id}>
-                  <div>
-                    <b>{c.name}</b>
-                    <StatusBadge status={c.verification_status} />
+                <li className="item" key={c.id}>
+                  <div className="item__head">
+                    <h3 className="item__title">{c.name}</h3>
+                    <Status status={c.verification_status} />
                   </div>
-                  <p>
+                  <p className="item__text">
                     {c.organization} · {c.service_area}
                     {c.district ? `, ${c.district}` : ""}
                   </p>
-                  <small>{c.phone}</small>
-                  <button disabled={busy} onClick={() => void act({ action: "verifyCollector", collectorId: c.id }, t(`${c.name} is now verified.`, `${c.name} තහවුරු කළා.`))}>
-                    {t("Verify collector", "තහවුරු කරන්න")}
-                  </button>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="system-card">
-          <h3>{t("Rewards to deliver", "ලබා දිය යුතු ත්‍යාග")}</h3>
-          {openRedemptions.length === 0 ? (
-            <Empty text={t("No rewards are waiting to be delivered.", "ලබා දීමට ත්‍යාග නැත.")} />
-          ) : (
-            <div className="job-list">
-              {openRedemptions.map((r) => (
-                <article key={r.id}>
-                  <div>
-                    <b>{r.reward_name}</b>
-                    <StatusBadge status={r.status ?? "Requested"} />
+                  <p className="item__meta">{c.phone}</p>
+                  <div className="item__actions">
+                    <button className="btn btn--primary btn--sm" disabled={busy} onClick={() => void act({ action: "verifyCollector", collectorId: c.id }, { si: `${c.name} තහවුරු කළා.`, en: `${c.name} is verified.` })}>
+                      <Bi si="තහවුරු කරන්න" en="Verify" />
+                    </button>
                   </div>
-                  <p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+        <Panel si="ලබා දිය යුතු ත්‍යාග" en="Rewards to deliver">
+          {openRedemptions.length === 0 ? (
+            <Empty si="ලබා දීමට ත්‍යාග නැත." en="No rewards waiting." />
+          ) : (
+            <ul className="list">
+              {openRedemptions.map((r) => (
+                <li className="item" key={r.id}>
+                  <div className="item__head">
+                    <h3 className="item__title">{r.reward_name}</h3>
+                    <Status status={r.status ?? "Requested"} />
+                  </div>
+                  <p className="item__text">
                     {r.collector_name} · {r.points} coins
                   </p>
-                  <small>
-                    <code>{r.reference}</code> · {r.created_at.slice(0, 10)}
-                  </small>
-                  <button disabled={busy} onClick={() => void act({ action: "markRedemptionDelivered", redemptionId: r.id }, t("Marked as delivered.", "ලබා දුන් බව සටහන් කළා."))}>
-                    {t("Mark delivered", "ලබා දුන්නා")}
-                  </button>
-                </article>
+                  <p className="item__meta">
+                    <code className="code">{r.reference}</code> · {r.created_at.slice(0, 10)}
+                  </p>
+                  <div className="item__actions">
+                    <button className="btn btn--primary btn--sm" disabled={busy} onClick={() => void act({ action: "markRedemptionDelivered", redemptionId: r.id }, { si: "ලබා දුන් බව සටහන් කළා.", en: "Marked as delivered." })}>
+                      <Bi si="ලබා දුන්නා" en="Mark delivered" />
+                    </button>
+                  </div>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
-        </div>
+        </Panel>
       </div>
 
-      <div className="system-card wide">
-        <div className="card-head">
-          <h3>{t("Pickup requests", "එකතු කිරීමේ ඉල්ලීම්")}</h3>
-          <div className="admin-filters">
-            <input type="search" value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} placeholder={t("Search name, phone, reference…", "නම, අංකය, reference…")} aria-label={t("Search requests", "ඉල්ලීම් සොයන්න")} />
-            <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(0); }} aria-label={t("Status", "තත්ත්වය")}>
-              <option value="open">{t("Open", "විවෘත")}</option>
-              <option value="all">{t("All", "සියල්ල")}</option>
-              {["Pending", "Scheduled", "Awaiting Confirmation", "Disputed", "Completed", "Cancelled"].map((s) => (
-                <option key={s} value={s}>
-                  {isSi ? statusLabels[s] : s}
-                </option>
-              ))}
-            </select>
-            <select value={district} onChange={(e) => { setDistrict(e.target.value); setPage(0); }} aria-label={t("District", "දිස්ත්‍රික්කය")}>
-              <option value="all">{t("All districts", "සියලු දිස්ත්‍රික්ක")}</option>
-              {DISTRICTS.map((d) => (
-                <option key={d.value} value={d.value}>
-                  {isSi ? d.si : d.value}
-                </option>
-              ))}
-            </select>
-          </div>
+      <Panel si="එකතු කිරීමේ ඉල්ලීම්" en="Pickup requests">
+        <div className="filters">
+          <input className="input input--sm" type="search" value={search} onChange={(e) => { setSearch(e.target.value); resetPage(); }} placeholder={bi("නම, අංකය, reference", "Name, phone, reference")} aria-label={bi("සොයන්න", "Search")} />
+          <select className="input input--sm" value={status} onChange={(e) => { setStatus(e.target.value); resetPage(); }} aria-label={bi("තත්ත්වය", "Status")}>
+            <option value="open">{bi("විවෘත", "Open")}</option>
+            <option value="all">{bi("සියල්ල", "All")}</option>
+            {ADMIN_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {bi(statusSi[s], s)}
+              </option>
+            ))}
+          </select>
+          <select className="input input--sm" value={district} onChange={(e) => { setDistrict(e.target.value); resetPage(); }} aria-label={bi("දිස්ත්‍රික්කය", "District")}>
+            <option value="all">{bi("සියලු දිස්ත්‍රික්ක", "All districts")}</option>
+            {DISTRICTS.map((d) => (
+              <option key={d.value} value={d.value}>
+                {bi(d.si, d.value)}
+              </option>
+            ))}
+          </select>
         </div>
         {pageItems.length === 0 ? (
-          <Empty text={t("No pickup requests match these filters.", "මෙම පෙරහන්වලට ගැළපෙන ඉල්ලීම් නැත.")} />
+          <Empty si="ගැළපෙන ඉල්ලීම් නැත." en="No requests match." />
         ) : (
-          <div className="request-list">
+          <ul className="list">
             {pageItems.map((r) => (
-              <AdminRequest key={r.id} request={r} busy={busy} act={act} t={t} />
+              <AdminRequest key={r.id} request={r} busy={busy} act={act} />
             ))}
-          </div>
+          </ul>
         )}
         {pageCount > 1 && (
           <div className="pager">
-            <button type="button" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>
-              ← {t("Previous", "පෙර")}
+            <button type="button" className="btn btn--ghost btn--sm" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>
+              ← <Bi si="පෙර" en="Previous" />
             </button>
             <span>
-              {currentPage + 1} / {pageCount} · {filtered.length} {t("requests", "ඉල්ලීම්")}
+              {currentPage + 1} / {pageCount} · {filtered.length}
             </span>
-            <button type="button" disabled={currentPage >= pageCount - 1} onClick={() => setPage(currentPage + 1)}>
-              {t("Next", "ඊළඟ")} →
+            <button type="button" className="btn btn--ghost btn--sm" disabled={currentPage >= pageCount - 1} onClick={() => setPage(currentPage + 1)}>
+              <Bi si="ඊළඟ" en="Next" /> →
             </button>
           </div>
         )}
-        {admin.requests.length >= 500 && <small className="form-help">{t("Showing the latest 500 requests.", "නවතම ඉල්ලීම් 500 පෙන්වයි.")}</small>}
-      </div>
+        {admin.requests.length >= 500 && <Bi as="p" className="panel__note" si="නවතම ඉල්ලීම් 500 පෙන්වයි." en="Showing the latest 500 requests." />}
+      </Panel>
 
-      <div className="system-card wide">
-        <h3>{t("All collectors", "සියලු එකතු කරන්නන්")}</h3>
+      <Panel si="සියලු එකතු කරන්නන්" en="All collectors">
         {admin.collectors.length === 0 ? (
-          <Empty text={t("No collectors registered yet.", "තවම එකතු කරන්නන් ලියාපදිංචි වී නැත.")} />
+          <Empty si="තවම ලියාපදිංචි වී නැත." en="No collectors registered yet." />
         ) : (
-          <div className="job-list job-grid">
+          <ul className="list list--grid">
             {admin.collectors.map((c) => (
-              <article key={c.id}>
-                <div>
-                  <b>{c.name}</b>
-                  <StatusBadge status={c.verification_status} />
+              <li className="item" key={c.id}>
+                <div className="item__head">
+                  <h3 className="item__title">{c.name}</h3>
+                  <Status status={c.verification_status} />
                 </div>
-                <p>
+                <p className="item__text">
                   {c.phone} · {c.service_area}
                   {c.district ? `, ${c.district}` : ""}
                 </p>
-                <small>{c.has_access_key ? t("Access key set", "Access key ඇත") : t("No access key — issue one so they can sign in", "Access key නැත — පිවිසීමට එකක් නිකුත් කරන්න")}</small>
-                <div className="button-row">
-                  <button disabled={busy} onClick={() => void issueKey(c)}>
-                    {c.has_access_key ? t("Reset key", "Key එක යළි සකසන්න") : t("Issue key", "Key නිකුත් කරන්න")}
+                <p className="item__meta">
+                  {c.has_access_key ? <Bi si="Access key ඇත" en="Access key set" /> : <Bi si="Access key නැත" en="No access key" />}
+                </p>
+                <div className="item__actions">
+                  <button className="btn btn--secondary btn--sm" disabled={busy} onClick={() => void issueKey(c)}>
+                    {c.has_access_key ? <Bi si="Key යළි සකසන්න" en="Reset key" /> : <Bi si="Key නිකුත් කරන්න" en="Issue key" />}
                   </button>
                   {c.verification_status === "Verified" ? (
                     <button
-                      className="danger"
+                      className="btn btn--danger btn--sm"
                       disabled={busy}
                       onClick={() => {
-                        if (window.confirm(t(`Suspend ${c.name}? Their scheduled pickups return to the open list.`, `${c.name} අත්හිටුවන්නද? ඔවුන්ට පැවරූ ඉල්ලීම් නැවත විවෘත වේ.`)))
-                          void act({ action: "suspendCollector", collectorId: c.id }, t(`${c.name} suspended.`, `${c.name} අත්හිටුවා ඇත.`));
+                        if (window.confirm(bi(`${c.name} අත්හිටුවන්නද?`, `Suspend ${c.name}? Their scheduled pickups return to the open list.`)))
+                          void act({ action: "suspendCollector", collectorId: c.id }, { si: `${c.name} අත්හිටුවා ඇත.`, en: `${c.name} suspended.` });
                       }}
                     >
-                      {t("Suspend", "අත්හිටුවන්න")}
+                      <Bi si="අත්හිටුවන්න" en="Suspend" />
                     </button>
                   ) : c.verification_status === "Suspended" ? (
-                    <button disabled={busy} onClick={() => void act({ action: "verifyCollector", collectorId: c.id }, t(`${c.name} reinstated.`, `${c.name} නැවත සක්‍රිය කළා.`))}>
-                      {t("Reinstate", "නැවත සක්‍රිය කරන්න")}
+                    <button className="btn btn--primary btn--sm" disabled={busy} onClick={() => void act({ action: "verifyCollector", collectorId: c.id }, { si: `${c.name} නැවත සක්‍රියයි.`, en: `${c.name} reinstated.` })}>
+                      <Bi si="නැවත සක්‍රිය කරන්න" en="Reinstate" />
                     </button>
                   ) : null}
                 </div>
-              </article>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
-      </div>
-    </section>
+      </Panel>
+    </div>
   );
 }
 
-function AdminRequest({ request: r, busy, act, t }: { request: Pickup; busy: boolean; act: Act; t: T }) {
-  const run = (action: string, success: string, confirmText?: string) => {
+function AdminRequest({ request: r, busy, act }: { request: Pickup; busy: boolean; act: Act }) {
+  const run = (action: string, success: Message, confirmText?: string) => {
     if (confirmText && !window.confirm(confirmText)) return;
     void act({ action, requestId: r.id }, success);
   };
   const review = r.status === "Awaiting Confirmation" || r.status === "Disputed";
   return (
-    <article>
-      <div>
-        <b>
-          <WasteLabel value={r.waste_type} /> · {r.quantity}
-        </b>
-        <StatusBadge status={r.status} />
-      </div>
-      <p>
+    <li className="item">
+      <ItemHead si={`${wasteSi(r.waste_type)} · ${r.quantity}`} en={r.waste_type} status={r.status} />
+      <p className="item__text">
         {r.household_name} · <a href={`tel:${r.phone}`}>{r.phone}</a> · {r.address}
         {r.district ? `, ${r.district}` : ""}
       </p>
-      <small>
-        {r.id} · {r.pickup_date} {r.pickup_time}
+      <p className="item__meta">
+        <code className="code">{r.id}</code> · {r.pickup_date} {r.pickup_time}
         {r.collector_name ? ` · 🚛 ${r.collector_name}` : ""}
-        {r.recorded_weight ? ` · ${r.recorded_weight} kg ${t("recorded", "සටහන් කළා")}` : ""}
+        {r.recorded_weight ? ` · ${r.recorded_weight} kg` : ""}
         {r.status_note ? ` · ${r.status_note}` : ""}
-      </small>
-      <div className="button-row">
+      </p>
+      <div className="item__actions">
         {review && (
           <>
-            <button disabled={busy} onClick={() => run("adminApproveCompletion", t("Pickup approved — coins credited.", "අනුමත කළා — coins එකතු විය."))}>
-              ✓ {t("Approve", "අනුමත කරන්න")}
+            <button className="btn btn--primary btn--sm" disabled={busy} onClick={() => run("adminApproveCompletion", { si: "අනුමත කළා — coins එකතු විය.", en: "Approved — coins credited." })}>
+              <Bi si="අනුමත කරන්න" en="Approve" />
             </button>
-            <button disabled={busy} onClick={() => run("adminRejectCompletion", t("Completion rejected; back to scheduled.", "ප්‍රතික්ෂේප කළා; නැවත පවරා ඇත."))}>
-              {t("Reject completion", "ප්‍රතික්ෂේප කරන්න")}
+            <button className="btn btn--secondary btn--sm" disabled={busy} onClick={() => run("adminRejectCompletion", { si: "ප්‍රතික්ෂේප කළා; නැවත පවරා ඇත.", en: "Rejected; back to scheduled." })}>
+              <Bi si="ප්‍රතික්ෂේප කරන්න" en="Reject" />
             </button>
           </>
         )}
         {(r.status === "Scheduled" || review) && (
-          <button disabled={busy} onClick={() => run("adminReopenRequest", t("Request reopened for other collectors.", "ඉල්ලීම නැවත විවෘත කළා."))}>
-            {t("Reopen", "නැවත විවෘත කරන්න")}
+          <button className="btn btn--secondary btn--sm" disabled={busy} onClick={() => run("adminReopenRequest", { si: "ඉල්ලීම නැවත විවෘත කළා.", en: "Request reopened." })}>
+            <Bi si="නැවත විවෘත කරන්න" en="Reopen" />
           </button>
         )}
         {r.status !== "Completed" && r.status !== "Cancelled" && (
-          <button className="danger" disabled={busy} onClick={() => run("adminCancelRequest", t("Pickup request cancelled.", "ඉල්ලීම අවලංගු කළා."), t("Cancel this pickup request?", "මෙම ඉල්ලීම අවලංගු කරන්නද?"))}>
-            {t("Cancel", "අවලංගු කරන්න")}
+          <button className="btn btn--danger btn--sm" disabled={busy} onClick={() => run("adminCancelRequest", { si: "ඉල්ලීම අවලංගු කළා.", en: "Request cancelled." }, bi("මෙම ඉල්ලීම අවලංගු කරන්නද?", "Cancel this pickup request?"))}>
+            <Bi si="අවලංගු කරන්න" en="Cancel" />
           </button>
         )}
       </div>
-    </article>
-  );
-}
-
-function Empty({ text }: { text: string }) {
-  return (
-    <div className="system-empty">
-      <span>♻</span>
-      <p>{text}</p>
-    </div>
+    </li>
   );
 }

@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "EcoLoop — Smart Waste Management for Sri Lanka";
+export const alt = "NextGen — Smart Waste Management for Sri Lanka";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -35,9 +35,9 @@ export default function OpengraphImage() {
               fontWeight: 800,
             }}
           >
-            E
+            N
           </div>
-          EcoLoop
+          NextGen
         </div>
         <div style={{ marginTop: 48, fontSize: 72, fontWeight: 800, lineHeight: 1.1, maxWidth: 950 }}>Turn your waste into a better tomorrow.</div>
         <div style={{ marginTop: 28, fontSize: 32, color: "#c9f25b" }}>Free recyclable waste pickups across Sri Lanka</div>

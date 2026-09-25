@@ -1,4 +1,4 @@
-# EcoLoop — Smart Waste Management
+# NextGen — Smart Waste Management
 
 Households request free pickups of sorted recyclable waste, verified collectors
 complete them and earn coins, and admins verify collectors.

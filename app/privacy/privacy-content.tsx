@@ -1,5 +1,3 @@
-"use client";
-
 import LegalPage, { type LegalSection } from "../components/legal-page";
 
 const contactEmail = process.env.NEXT_PUBLIC_CONTACT_EMAIL;
@@ -8,8 +6,8 @@ const sections: LegalSection[] = [
   {
     title: "Who we are",
     titleSi: "අප කවුද",
-    body: <p>EcoLoop (www.nextgen.mom) connects households in Sri Lanka with verified collectors of sorted recyclable waste. This notice explains how we handle personal data under the Personal Data Protection Act, No. 9 of 2022.</p>,
-    bodySi: <p>EcoLoop (www.nextgen.mom) ශ්‍රී ලංකාවේ නිවාස, වෙන් කළ ප්‍රතිචක්‍රීකරණ කසළ එකතු කරන තහවුරු කළ එකතු කරන්නන් සමඟ සම්බන්ධ කරයි. 2022 අංක 9 දරන පුද්ගලික දත්ත ආරක්ෂණ පනත යටතේ අප පුද්ගලික දත්ත හසුරුවන ආකාරය මෙම නිවේදනයෙන් පැහැදිලි කෙරේ.</p>,
+    body: <p>NextGen (www.nextgen.mom) connects households in Sri Lanka with verified collectors of sorted recyclable waste. This notice explains how we handle personal data under the Personal Data Protection Act, No. 9 of 2022.</p>,
+    bodySi: <p>NextGen (www.nextgen.mom) ශ්‍රී ලංකාවේ නිවාස, වෙන් කළ ප්‍රතිචක්‍රීකරණ කසළ එකතු කරන තහවුරු කළ එකතු කරන්නන් සමඟ සම්බන්ධ කරයි. 2022 අංක 9 දරන පුද්ගලික දත්ත ආරක්ෂණ පනත යටතේ අප පුද්ගලික දත්ත හසුරුවන ආකාරය මෙම නිවේදනයෙන් පැහැදිලි කෙරේ.</p>,
   },
   {
     title: "What we collect",
@@ -44,14 +42,14 @@ const sections: LegalSection[] = [
       <ul>
         <li>Open pickup requests show only the address, district, date and waste type to verified collectors.</li>
         <li>After a collector accepts your request, they see your name and phone number, and you see theirs.</li>
-        <li>EcoLoop administrators can see all requests and collector details to run the service.</li>
+        <li>NextGen administrators can see all requests and collector details to run the service.</li>
       </ul>
     ),
     bodySi: (
       <ul>
         <li>විවෘත ඉල්ලීම්වල තහවුරු කළ එකතු කරන්නන්ට පෙන්වන්නේ ලිපිනය, දිස්ත්‍රික්කය, දිනය සහ කසළ වර්ගය පමණි.</li>
         <li>එකතු කරන්නෙක් ඔබේ ඉල්ලීම භාරගත් පසු ඔවුන්ට ඔබේ නම සහ දුරකථන අංකය පෙනේ, ඔබට ඔවුන්ගේ තොරතුරුද පෙනේ.</li>
-        <li>සේවාව පවත්වාගෙන යාමට EcoLoop පරිපාලකයින්ට සියලු ඉල්ලීම් සහ එකතු කරන්නන්ගේ තොරතුරු බැලිය හැක.</li>
+        <li>සේවාව පවත්වාගෙන යාමට NextGen පරිපාලකයින්ට සියලු ඉල්ලීම් සහ එකතු කරන්නන්ගේ තොරතුරු බැලිය හැක.</li>
       </ul>
     ),
   },
@@ -73,13 +71,13 @@ const sections: LegalSection[] = [
     body: (
       <p>
         You may ask to access, correct or delete your personal data, or withdraw your consent, at any time.
-        {contactEmail ? <> Contact us at <a href={`mailto:${contactEmail}`}>{contactEmail}</a>.</> : " Contact the EcoLoop team through your collector or pickup request."}
+        {contactEmail ? <> Contact us at <a href={`mailto:${contactEmail}`}>{contactEmail}</a>.</> : " Contact the NextGen team through your collector or pickup request."}
       </p>
     ),
     bodySi: (
       <p>
         ඔබේ පුද්ගලික දත්ත බැලීමට, නිවැරදි කිරීමට, මකා දැමීමට හෝ ඔබේ එකඟතාව ඉල්ලා අස්කර ගැනීමට ඕනෑම වේලාවක ඉල්ලිය හැක.
-        {contactEmail ? <> අපව අමතන්න: <a href={`mailto:${contactEmail}`}>{contactEmail}</a>.</> : " ඔබේ එකතු කරන්නා හෝ ඉල්ලීම හරහා EcoLoop කණ්ඩායම අමතන්න."}
+        {contactEmail ? <> අපව අමතන්න: <a href={`mailto:${contactEmail}`}>{contactEmail}</a>.</> : " ඔබේ එකතු කරන්නා හෝ ඉල්ලීම හරහා NextGen කණ්ඩායම අමතන්න."}
       </p>
     ),
   },
