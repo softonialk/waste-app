@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import WasteScanner from "./components/waste-scanner";
+import WasteScanner, { preloadWasteModel } from "./components/waste-scanner";
 
 const steps = [
   { n: "01", icon: "♻️", title: "Sort Your Waste", titleSi: "කසළ වෙන් කරන්න", text: "Separate your recyclable waste into the correct categories.", textSi: "ප්‍රතිචක්‍රීකරණය කළ හැකි කසළ නිවැරදි කාණ්ඩවලට වෙන් කරන්න." },
@@ -110,6 +110,18 @@ export default function Home() {
   }, [language]);
 
   useEffect(() => {
+    const section = document.querySelector("#categories");
+    if (!section) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      void preloadWasteModel().catch(() => undefined);
+      observer.disconnect();
+    }, { rootMargin: "350px" });
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
     type ToolContext = { registerTool: (tool: object, options?: { signal?: AbortSignal }) => void | Promise<void> };
     const context = (document as Document & { modelContext?: ToolContext }).modelContext;
     if (!context?.registerTool) return;
@@ -213,7 +225,7 @@ export default function Home() {
         <div className="section-heading-row"><div><p className="kicker">{t("WASTE CATEGORIES", "කසළ වර්ග")}</p><h2>{t("Know Your", "ඔබේ කසළ")}{" "}<em>{t("Waste.", "හඳුනාගන්න.")}</em></h2></div><p>{t("Quickly identify the right category before you request a pickup. Accepted categories may vary by collector or collection point.", "එකතු කිරීමක් ඉල්ලීමට පෙර නිවැරදි කාණ්ඩය හඳුනාගන්න. පිළිගන්නා කාණ්ඩ එකතු කරන්නා හෝ ස්ථානය අනුව වෙනස් විය හැක.")}</p></div>
         <div className="category-grid">{categories.map((category) => <article className={`category-card ${category.color}`} key={category.title}><div className="category-thumb"><Image src={category.image} alt={`${category.title} recyclable waste`} width={240} height={240} /></div><div><h3>{isSi ? category.titleSi : category.title}</h3><p>{isSi ? category.itemsSi : category.items}</p></div></article>)}</div>
         <div className="waste-pathways"><article><span>♻️</span><div><small>{t("RECYCLABLE PATHWAY", "ප්‍රතිචක්‍රීකරණ මාර්ගය")}</small><h3>{t("Recyclable Waste", "ප්‍රතිචක්‍රීකරණ කසළ")}</h3><p>Plastic · Paper & Cardboard · Metal · Glass · E-Waste</p><b>{t("Sort → Request → Collect → Recycle", "වෙන් කරන්න → ඉල්ලන්න → එකතු කරන්න → ප්‍රතිචක්‍රීකරණය")}</b></div></article><article><span>🌿</span><div><small>{t("SEPARATE ORGANIC PATHWAY", "වෙනම කාබනික මාර්ගය")}</small><h3>{t("Organic Waste", "කාබනික කසළ")}</h3><p>{t("Food waste · Garden waste · Compostable waste", "ආහාර · ගෙවතු · කොම්පෝස්ට් කළ හැකි කසළ")}</p><b>{t("Separate → Composting / Organic Collection → Compost", "වෙන් කරන්න → කොම්පෝස්ට් / කාබනික එකතු කිරීම → කොම්පෝස්ට්")}</b></div></article></div>
-        <div className="tip-bar"><span>📷</span><div><b>{t("Not sure where your waste belongs?", "ඔබේ කසළ අයත් කාණ්ඩය විශ්වාස නැද්ද?")}</b><p>{t("Show one item to your camera and scan it automatically.", "එක භාණ්ඩයක් camera එකට පෙන්වා automatically scan කරන්න.")}</p></div><button type="button" onClick={() => setWasteGuideOpen(true)}>{t("Scan Waste", "කසළ Scan කරන්න")} <span>→</span></button></div>
+        <div className="tip-bar"><span>📷</span><div><b>{t("Not sure where your waste belongs?", "ඔබේ කසළ අයත් කාණ්ඩය විශ්වාස නැද්ද?")}</b><p>{t("Show one item to your camera and scan it automatically.", "එක භාණ්ඩයක් camera එකට පෙන්වා automatically scan කරන්න.")}</p></div><button type="button" onPointerEnter={() => void preloadWasteModel().catch(() => undefined)} onFocus={() => void preloadWasteModel().catch(() => undefined)} onClick={() => setWasteGuideOpen(true)}>{t("Scan Waste", "කසළ Scan කරන්න")} <span>→</span></button></div>
         {wasteGuideOpen && <WasteScanner language={language} onClose={() => setWasteGuideOpen(false)}/>} 
       </div></section>
 
