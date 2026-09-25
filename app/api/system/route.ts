@@ -1,10 +1,15 @@
+import { env } from "cloudflare:workers";
 import { getDatabase } from "../../../db/raw";
 
 export const dynamic = "force-dynamic";
 
 type ActionBody = Record<string, unknown> & { action?: string };
+const ADMIN_COOKIE = "ecoloop_admin";
 const id = (prefix: string) => `${prefix}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 const text = (value: unknown) => typeof value === "string" ? value.trim() : "";
+const cookieValue = (request: Request, name: string) => request.headers.get("cookie")?.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${name}=`))?.slice(name.length + 1) ?? "";
+const isAdmin = (request: Request) => Boolean(env.ADMIN_SESSION_TOKEN) && cookieValue(request, ADMIN_COOKIE) === env.ADMIN_SESSION_TOKEN;
+const adminCookie = (value: string, maxAge: number) => `${ADMIN_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAge}`;
 const validName = (value: unknown) => {
   const name = text(value);
   return name.length >= 2 && name.length <= 60 && /^[\p{L}\p{M}.' -]+$/u.test(name) && /\p{L}/u.test(name);
@@ -30,14 +35,26 @@ async function snapshot() {
   return { requests: requests.results, collectors: collectors.results, redemptions: redemptions.results };
 }
 
-export async function GET() {
-  try { return Response.json(await snapshot()); }
+async function withAdminState(request: Request) {
+  return { ...(await snapshot()), adminAuthenticated: isAdmin(request) };
+}
+
+export async function GET(request: Request) {
+  try { return Response.json(await withAdminState(request)); }
   catch { return Response.json({ error: "System data is temporarily unavailable." }, { status: 503 }); }
 }
 
 export async function POST(request: Request) {
   try {
     const body = await request.json() as ActionBody;
+    if (body.action === "adminLogin") {
+      if (!env.ADMIN_PASSWORD || !env.ADMIN_SESSION_TOKEN) return Response.json({ error: "Admin login is not configured." }, { status: 503 });
+      if (text(body.password) !== env.ADMIN_PASSWORD) return Response.json({ error: "Incorrect admin password." }, { status: 401 });
+      return Response.json({ ...(await snapshot()), adminAuthenticated: true }, { headers: { "Set-Cookie": adminCookie(env.ADMIN_SESSION_TOKEN, 60 * 60 * 8) } });
+    }
+    if (body.action === "adminLogout") {
+      return Response.json({ ...(await snapshot()), adminAuthenticated: false }, { headers: { "Set-Cookie": adminCookie("", 0) } });
+    }
     const db = getDatabase();
     if (body.action === "createRequest") {
       const required = ["householdName", "phone", "address", "wasteType", "quantity", "pickupDate", "pickupTime"];
@@ -59,12 +76,14 @@ export async function POST(request: Request) {
       if (!collector) return Response.json({ error: "Only a verified collector can accept requests." }, { status: 403 });
       await db.prepare("UPDATE collection_requests SET status = 'Scheduled', collector_id = ?, collector_name = ? WHERE id = ? AND status = 'Pending'").bind(text(body.collectorId), collector.name, text(body.requestId)).run();
     } else if (body.action === "rejectRequest") {
+      if (!isAdmin(request)) return Response.json({ error: "Admin login required." }, { status: 401 });
       await db.prepare("UPDATE collection_requests SET status = 'Cancelled' WHERE id = ? AND status = 'Pending'").bind(text(body.requestId)).run();
     } else if (body.action === "completeRequest") {
       const weight = Number(body.weight);
       if (!Number.isFinite(weight) || weight <= 0) return Response.json({ error: "Enter the verified collected weight." }, { status: 400 });
       await db.prepare("UPDATE collection_requests SET status = 'Completed', recorded_weight = ?, waste_type = ?, coins_awarded = 100 WHERE id = ? AND collector_id = ? AND status = 'Scheduled'").bind(weight, text(body.wasteType), text(body.requestId), text(body.collectorId)).run();
     } else if (body.action === "verifyCollector") {
+      if (!isAdmin(request)) return Response.json({ error: "Admin login required." }, { status: 401 });
       await db.prepare("UPDATE collectors SET verification_status = 'Verified' WHERE id = ?").bind(text(body.collectorId)).run();
     } else if (body.action === "redeem") {
       const collectorId = text(body.collectorId); const points = Number(body.points);
@@ -74,6 +93,6 @@ export async function POST(request: Request) {
       const reference = `ECO-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
       await db.prepare("INSERT INTO redemptions (id, collector_id, reward_name, points, reference, created_at) VALUES (?, ?, ?, ?, ?, ?)").bind(id("RED"), collectorId, text(body.rewardName), points, reference, new Date().toISOString()).run();
     } else return Response.json({ error: "Unknown action." }, { status: 400 });
-    return Response.json(await snapshot());
+    return Response.json(await withAdminState(request));
   } catch { return Response.json({ error: "The request could not be completed. Please try again." }, { status: 500 }); }
 }
